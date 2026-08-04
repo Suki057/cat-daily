@@ -191,7 +191,8 @@
 
   .cat-manage{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .cat-chip{display:flex;align-items:center;gap:7px;background:var(--surface-2);border:1.5px solid var(--line-soft);border-radius:20px;padding:7px 13px;font-weight:700;cursor:pointer;color:var(--ink-soft);}
-  .cat-chip .x{color:var(--muted);font-size:16px;}
+  .cat-chip .x{color:var(--muted);font-size:14px;font-weight:800;margin-left:6px;padding:2px 8px;border-radius:50%;cursor:pointer;user-select:none;-webkit-user-select:none;line-height:1.4;touch-action:manipulation;transition:all .15s;pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;min-width:22px;min-height:22px;}
+  .cat-chip .x:hover,.cat-chip .x:active{background:rgba(216,124,95,.16);color:var(--coral-ink);transform:scale(1.08);}
   .cat-chip.active{border-color:var(--accent);color:var(--accent-ink);background:#fff;box-shadow:var(--shadow-xs);}
 
   .empty{text-align:center;color:var(--muted);padding:30px 14px;font-size:14px;border:1.5px dashed var(--line-soft);border-radius:var(--radius-sm);margin-top:4px;}
@@ -295,11 +296,6 @@
   <div class="card">
     <h2><span class="em">🗑</span> 回收站 <span id="recycleBadge" class="tag warn" style="display:none;margin-left:auto;">0</span></h2>
     <div class="list-row" id="openRecycleBtn" style="cursor:pointer;"><div class="ic">📦</div><div class="lb">查看回收站（7 天后自动清理）</div><div class="arrow">›</div></div>
-  </div>
-  <div class="card">
-    <h2><span class="em">🗂️</span> 自定义分类</h2>
-    <div id="customCatList"></div>
-    <button class="btn ghost sm" id="addCustomCatBtn" style="margin-top:12px;">＋ 添加分类</button>
   </div>
   <div class="card">
     <h2><span class="em">💾</span> 数据</h2>
@@ -494,6 +490,24 @@ function ensureShape(r){
   // 剔除旧版"默认猫咪"自动档案，并修正 activeCat 引用
   d.cats = (d.cats||[]).filter(c => c && c.id && c.name !== "默认猫咪");
   if(d.activeCat && !d.cats.find(c=>c.id===d.activeCat)) d.activeCat = d.cats[0] ? d.cats[0].id : null;
+  // 一次性迁移：v2.4 移除自定义分类板块时，把已有 customCats + 关联库存 → 回收站
+  if(d.customCats.length > 0 && !d._migrateCustomCatsRemoved){
+    const now = Date.now();
+    d.customCats.forEach(cat=>{
+      const items = d.inventory.filter(it=>it.cat===cat.key).map(it=>({...it, logs:[...(it.logs||[])]}));
+      d.recycleBin.push({
+        id: "rb_mig_"+Math.random().toString(36).slice(2,8),
+        type: "category",
+        cat: {...cat},
+        isSystem: false,
+        items: items,
+        deletedAt: now
+      });
+      d.inventory = d.inventory.filter(it=>it.cat!==cat.key);
+    });
+    d.customCats = [];
+    d._migrateCustomCatsRemoved = true;
+  }
   return d;
 }
 function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
@@ -621,6 +635,9 @@ function bindLongPress(el, onLong){
 let stockFilter = "all";
 function renderStockFilter(){
   const row=document.getElementById("stockFilter"); row.innerHTML="";
+  // 兜底：若 stockFilter 指向已删除/已不存在的分类，重置为 "all"
+  const validKeys = ["all"].concat(allCats().map(c=>c.key));
+  if(!validKeys.includes(stockFilter)) stockFilter = "all";
 
   // 全部（不能长按删除）
   const all=document.createElement("div");
@@ -687,13 +704,6 @@ function renderStockFilter(){
 
     row.appendChild(el);
   });
-
-  // 添加分类（虚线，按钮样式）
-  const addCat=document.createElement("div");
-  addCat.className="chip dashed";
-  addCat.textContent="＋ 添加分类";
-  addCat.onclick=()=>openNewCatSheet();
-  row.appendChild(addCat);
 
   // 添加库存（绿色动作按钮）
   const addStock=document.createElement("div");
@@ -1206,10 +1216,12 @@ document.getElementById("newCatSaveBtn").onclick=()=>{
   renderStockFilter(); renderStock();
   toast("已添加新分类「"+label+"」✨");
 };
-document.getElementById("addCustomCatBtn").onclick=openNewCatSheet;
+// v2.4 已移除「自定义分类」板块，按钮元素随之删除，保留函数定义以便兼容旧调用
+document.getElementById("addCustomCatBtn");
 
 function renderCustomCatList(){
-  const box = document.getElementById("customCatList"); box.innerHTML="";
+  const box = document.getElementById("customCatList"); if(!box) return;
+  box.innerHTML="";
   if(DB.customCats.length===0){
     box.innerHTML='<div class="empty"><span class="em">📁</span>暂无自定义分类</div>';
     return;
@@ -1495,8 +1507,8 @@ function renderCatManage(){
   DB.cats.forEach(c=>{
     const el=document.createElement("div");
     el.className="cat-chip"+(c.id===DB.activeCat?" active":"");
-    el.innerHTML=`<span style="width:9px;height:9px;border-radius:50%;background:${c.color};display:inline-block"></span>${escapeHtml(c.name)}<span class="x" data-delcat="${c.id}" title="删除" style="margin-left:4px;cursor:pointer;">×</span>`;
-    el.querySelector("[data-delcat]").onclick=(e)=>{ e.stopPropagation(); sendCatToRecycle(c.id); };
+    el.innerHTML=`<span style="width:9px;height:9px;border-radius:50%;background:${c.color};display:inline-block"></span>${escapeHtml(c.name)}<span class="x" data-delcat="${c.id}" title="删除这只猫咪" style="touch-action:manipulation;">✕</span>`;
+    el.querySelector("[data-delcat]").onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(e.stopImmediatePropagation) e.stopImmediatePropagation(); sendCatToRecycle(c.id); };
     el.onclick=()=>{ DB.activeCat=c.id; save(); renderCatPill(); renderCatManage(); renderStock(); renderFlow(); renderStats(); renderAlerts(); };
     box.appendChild(el);
   });

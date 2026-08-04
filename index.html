@@ -62,7 +62,9 @@
   .card h2 .em{font-size:19px;}
 
   .filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
-  .chip{background:var(--surface);border:1.5px solid var(--line-soft);border-radius:16px;padding:6px 13px;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:.15s;}
+  .chip{background:var(--surface);border:1.5px solid var(--line-soft);border-radius:16px;padding:6px 13px;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:.15s;position:relative;user-select:none;-webkit-user-select:none;}
+  .chip.show-x{z-index:4;}
+  .chip .x-badge{position:absolute;top:-9px;left:-9px;width:20px;height:20px;background:#fff;border:1.5px solid var(--coral);color:var(--coral);border-radius:50%;display:none;align-items:center;justify-content:center;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 3px 8px rgba(58,64,52,.20);z-index:6;line-height:1;padding-bottom:1px;}
   .chip.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(93,140,97,.28);}
   .chip.dashed{background:transparent;border-style:dashed;color:var(--muted);}
   .chip.dashed.active{background:transparent;color:var(--accent-ink);border-style:solid;border-color:var(--accent);}
@@ -278,6 +280,10 @@
     <button class="btn sm" id="saveSetBtn" style="margin-top:6px;">保存设置</button>
   </div>
   <div class="card">
+    <h2><span class="em">🗑</span> 回收站 <span id="recycleBadge" class="tag warn" style="display:none;margin-left:auto;">0</span></h2>
+    <div class="list-row" id="openRecycleBtn" style="cursor:pointer;"><div class="ic">📦</div><div class="lb">查看回收站（7 天后自动清理）</div><div class="arrow">›</div></div>
+  </div>
+  <div class="card">
     <h2><span class="em">🗂️</span> 自定义分类</h2>
     <div id="customCatList"></div>
     <button class="btn ghost sm" id="addCustomCatBtn" style="margin-top:12px;">＋ 添加分类</button>
@@ -391,20 +397,26 @@
 <input type="file" id="importFile" accept="application/json" class="hidden" />
 <div class="toast" id="toast"></div>
 
+<!-- 回收站 -->
+<div class="mask" id="recycleMask">
+  <div class="sheet" style="position:relative;">
+    <span class="close-x" data-close-recycle>×</span>
+    <h3>🗑 回收站</h3>
+    <div class="desc">7 天前的项会自动清理；可单条恢复 / 永久删除，或一键清空。</div>
+    <div id="recycleList"></div>
+    <button class="btn ghost sm" id="recycleEmptyBtn" style="margin-top:14px;">🚮 一键清空回收站</button>
+  </div>
+</div>
+
 <script>
 "use strict";
 
-/* ---------- 系统预设分类 ---------- */
+/* ---------- 系统预设分类（4 个） ---------- */
 const SYSTEM_CATS = [
-  {key:"kibble",    label:"猫粮",     em:"🌾", color:"#8B6B4E"},
-  {key:"can",       label:"猫罐头",   em:"🥫", color:"#5D8C61"},
-  {key:"stick",     label:"猫条",     em:"🍥", color:"#E6C987"},
-  {key:"snack",     label:"零食",     em:"🦴", color:"#D87C5F"},
-  {key:"food",      label:"食物",     em:"🍗", color:"#A3B18A"},
-  {key:"supplement",label:"营养品",   em:"💊", color:"#6A9E6E"},
-  {key:"medicine",  label:"驱虫/药品",em:"🪱", color:"#9A4D38"},
-  {key:"litter",    label:"猫砂",     em:"🧹", color:"#C08552"},
-  {key:"other",     label:"其他",     em:"✨", color:"#8A9A7D"},
+  {key:"kibble",    label:"猫粮",   em:"🌾", color:"#8B6B4E"},
+  {key:"supplement",label:"营养品", em:"💊", color:"#6A9E6E"},
+  {key:"medicine",  label:"驱虫",   em:"🪱", color:"#9A4D38"},
+  {key:"litter",    label:"猫砂",   em:"🧹", color:"#C08552"},
 ];
 const EMOJI_PRESETS = ["📦","🥫","🍥","🍗","🍖","🦐","🥛","🍱","🥣","🍪","🧴","🧊","🪥","🧹","🪴","🧽","🥡","🫙","💧","🧊","🪵","🎀","🪞"];
 const COLOR_PRESETS = ["#5D8C61","#D87C5F","#3f8ba6","#9A4D38","#A3B18A","#E6C987","#C08552","#7A9B6E","#B0848F","#8B6B4E","#6A9E6E","#C45A48"];
@@ -423,6 +435,7 @@ const CARE = {
   inventory:[{id,catId,cat,name,brand,spec,qty,threshold,expiry,note,updatedAt,cover,logs:[]}]
   careLogs:[{id,catId,type,ts,note}]
   customCats:[{key,label,em,color}]   // 用户自定义分类（按添加顺序）
+  recycleBin:[{id,type,cat,isSystem,items,deletedAt}]  // 回收站：仅分类删除；7 天自动清理
 */
 const KEY = "catdaily_v2";
 let DB = load();
@@ -441,12 +454,26 @@ function ensureShape(r){
     library:{},
     inventory:[],
     careLogs:[],
-    customCats:[]
+    customCats:[],
+    recycleBin:[]
   }, r||{});
   d.customCats = d.customCats||[];
   d.library = d.library||{};
   d.careLogs = d.careLogs||[];
   d.inventory = d.inventory||[];
+  d.recycleBin = d.recycleBin || [];
+  // 7 天自动清理回收站
+  const cutoff = Date.now() - 7*24*3600*1000;
+  d.recycleBin = d.recycleBin.filter(x => (x.deletedAt||0) > cutoff);
+  // 旧分类重映射：v2.0 之前被砍掉的旧系统分类 → 归并到「猫粮」/「驱虫」
+  const systemKeys = SYSTEM_CATS.map(c=>c.key);
+  d.inventory.forEach(it=>{
+    const isValid = systemKeys.includes(it.cat) || d.customCats.some(c=>c.key===it.cat);
+    if(!isValid){
+      if(it.cat==="medicine" || it.cat==="dewi" || it.cat==="dewe") it.cat = "medicine";
+      else it.cat = "kibble";  // can/stick/snack/food/other 等归并到「猫粮」
+    }
+  });
   return d;
 }
 function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
@@ -497,23 +524,87 @@ function catIconHTML(catKey, cover, sizeCls){
 
 function myInventory(){ return DB.inventory.filter(x=>x.catId===DB.activeCat); }
 
+/* ---------- 长按手势 ---------- */
+function bindLongPress(el, onLong){
+  let timer=null, fired=false;
+  const start=()=>{ fired=false; timer=setTimeout(()=>{ fired=true; timer=null; onLong(); }, 550); };
+  const cancel=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+  el.addEventListener('touchstart', start, {passive:true});
+  el.addEventListener('touchend', cancel);
+  el.addEventListener('touchmove', cancel);
+  el.addEventListener('mousedown', start);
+  el.addEventListener('mouseup', cancel);
+  el.addEventListener('mouseleave', cancel);
+}
+
 /* ---------- 库存 chip 行 + 列表 ---------- */
 let stockFilter = "all";
 function renderStockFilter(){
   const row=document.getElementById("stockFilter"); row.innerHTML="";
 
-  // 全部
+  // 全部（不能长按删除）
   const all=document.createElement("div");
   all.className="chip"+(stockFilter==="all"?" active":"");
-  all.textContent="全部"; all.onclick=()=>{stockFilter="all"; renderStockFilter(); renderStock();};
+  all.textContent="全部";
+  all.onclick=()=>{stockFilter="all"; renderStockFilter(); renderStock();};
   row.appendChild(all);
 
-  // 每个分类
+  // 每个分类（可长按删除）
   allCats().forEach(c=>{
     const el=document.createElement("div");
     el.className="chip"+(stockFilter===c.key?" active":"");
-    el.textContent=c.label;
-    el.onclick=()=>{stockFilter=c.key; renderStockFilter(); renderStock();};
+    el.dataset.catKey = c.key;
+    el.appendChild(document.createTextNode(c.label));
+
+    // ❌ 徽章（默认隐藏）
+    const x = document.createElement("span");
+    x.className = "x-badge";
+    x.textContent = "❌";
+    x.onclick = (e)=>{
+      e.stopPropagation();
+      const msg = "删除分类「"+c.label+"」？\n该分类下所有库存会进入回收站（7 天后自动清理）。";
+      if(confirm(msg)){
+        sendCategoryToRecycle(c);
+      }else{
+        el.classList.remove("show-x");
+        x.style.display = "none";
+      }
+    };
+    el.appendChild(x);
+
+    // 普通点击：若在 show-x 状态 → 关闭；否则切换 filter
+    el.onclick = (e)=>{
+      if(e.target === x) return;
+      if(el.classList.contains("show-x")){
+        el.classList.remove("show-x");
+        x.style.display = "none";
+        return;
+      }
+      stockFilter = c.key;
+      renderStockFilter(); renderStock();
+    };
+
+    // 长按 = 显示 ❌
+    bindLongPress(el, ()=>{
+      // 关闭其他 chip 的 ❌
+      row.querySelectorAll(".chip.show-x").forEach(b=>{
+        b.classList.remove("show-x");
+        const bx = b.querySelector(".x-badge"); if(bx) bx.style.display = "none";
+      });
+      el.classList.add("show-x");
+      x.style.display = "flex";
+      // 点其他地方关闭
+      setTimeout(()=>{
+        const handler = (ev)=>{
+          if(el.contains(ev.target)) return;
+          el.classList.remove("show-x");
+          x.style.display = "none";
+          document.removeEventListener("click", handler, true);
+        };
+        document.addEventListener("click", handler, true);
+      }, 0);
+    });
+
     row.appendChild(el);
   });
 
@@ -771,6 +862,126 @@ document.getElementById("invDelBtn").onclick=()=>{
   toast("已删除");
 };
 document.getElementById("addStockBtn").onclick=()=>openInvSheet(null);
+
+/* ---------- 回收站 ---------- */
+function sendCategoryToRecycle(cat){
+  // 1) 备份该分类下所有库存条目（深拷贝）
+  const items = DB.inventory.filter(it=>it.cat===cat.key).map(it=>({...it, logs:[...(it.logs||[])]}));
+  // 2) 是否系统分类
+  const isSystem = SYSTEM_CATS.some(s=>s.key===cat.key);
+  // 3) push 到回收站
+  DB.recycleBin.push({
+    id: uid("rb"),
+    type: "category",
+    cat: {...cat},
+    isSystem: isSystem,
+    items: items,
+    deletedAt: Date.now()
+  });
+  // 4) 删除该分类（自定义的） + 该分类下所有库存
+  if(!isSystem){
+    DB.customCats = DB.customCats.filter(c=>c.key!==cat.key);
+  }
+  DB.inventory = DB.inventory.filter(it=>it.cat!==cat.key);
+  // 5) 如果当前 filter 指向它，切回 all
+  if(stockFilter===cat.key) stockFilter="all";
+  save();
+  renderStockFilter(); renderStock(); renderStats(); renderFlow(); renderAlerts();
+  renderCustomCatList(); renderRecycleBadge();
+  toast("已移入回收站 🗑");
+}
+
+function openRecycleSheet(){
+  renderRecycleList();
+  document.getElementById("recycleMask").classList.add("show");
+}
+function closeRecycleSheet(){ document.getElementById("recycleMask").classList.remove("show"); }
+document.querySelectorAll("[data-close-recycle]").forEach(x=>x.onclick=closeRecycleSheet);
+document.getElementById("recycleMask").onclick=e=>{ if(e.target.id==="recycleMask") closeRecycleSheet(); };
+document.getElementById("openRecycleBtn").onclick=openRecycleSheet;
+
+function renderRecycleBadge(){
+  const b = document.getElementById("recycleBadge");
+  const n = DB.recycleBin.length;
+  if(n>0){ b.style.display="inline-block"; b.textContent = n; }
+  else b.style.display="none";
+}
+
+function renderRecycleList(){
+  const box=document.getElementById("recycleList");
+  const emptyBtn=document.getElementById("recycleEmptyBtn");
+  box.innerHTML="";
+  if(DB.recycleBin.length===0){
+    box.innerHTML='<div class="empty"><span class="em">🧺</span>回收站是空的</div>';
+    emptyBtn.style.display="none";
+    return;
+  }
+  emptyBtn.style.display="";
+  let html="";
+  DB.recycleBin.slice().sort((a,b)=>b.deletedAt-a.deletedAt).forEach(r=>{
+    const leftMs = (r.deletedAt + 7*24*3600*1000) - Date.now();
+    const leftDays = Math.max(0, Math.ceil(leftMs/86400000));
+    const tagCls = leftDays<=1?"warn":leftDays<=3?"amber":"";
+    const tagTxt = `剩 ${leftDays} 天清理`;
+    const em = r.cat && r.cat.em ? r.cat.em : "📁";
+    const lbl = `分类：${escapeHtml(r.cat.label)}（含 ${r.items.length} 项库存）`;
+    const delDate = new Date(r.deletedAt).toLocaleDateString("zh-CN");
+    html += `<div class="list-row" style="border:1px solid var(--line-soft);border-radius:14px;padding:11px 13px;margin-bottom:9px;background:var(--surface-2);align-items:flex-start;">
+      <div class="ic" style="font-size:20px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:${r.cat.color||'#8A9A7D'}22;">${em}</div>
+      <div class="lb" style="flex:1;min-width:0;">
+        <div style="font-weight:800;font-size:14px;color:var(--ink);">${lbl}</div>
+        <div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;">
+          <span class="tag ${tagCls}">${tagTxt}</span>
+          <span class="tag">${delDate} 删除</span>
+        </div>
+        <div style="margin-top:9px;display:flex;gap:7px;">
+          <button data-recover="${r.id}" style="background:var(--accent-soft);border:1.5px solid var(--accent);color:var(--accent-ink);border-radius:11px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;">↩️ 恢复</button>
+          <button data-permdel="${r.id}" style="background:rgba(216,124,95,.08);border:1px solid rgba(216,124,95,.3);color:var(--coral-ink);border-radius:11px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;">永久删除</button>
+        </div>
+      </div>
+    </div>`;
+  });
+  box.innerHTML = html;
+
+  box.querySelectorAll("[data-recover]").forEach(b=>b.onclick=()=>{
+    const r = DB.recycleBin.find(x=>x.id===b.dataset.recover);
+    if(!r) return;
+    // 恢复：自定义分类重建 + 库存条目放回
+    if(!r.isSystem){
+      if(!DB.customCats.find(c=>c.key===r.cat.key)){
+        DB.customCats.push(r.cat);
+      }
+    }
+    r.items.forEach(it=>{
+      if(!DB.inventory.find(x=>x.id===it.id)) DB.inventory.push(it);
+    });
+    DB.recycleBin = DB.recycleBin.filter(x=>x.id!==r.id);
+    save();
+    renderRecycleList(); renderRecycleBadge();
+    renderStockFilter(); renderStock(); renderStats(); renderFlow(); renderAlerts();
+    renderCustomCatList();
+    toast("已恢复 ↩️");
+  });
+  box.querySelectorAll("[data-permdel]").forEach(b=>b.onclick=()=>{
+    const r = DB.recycleBin.find(x=>x.id===b.dataset.permdel);
+    if(!r) return;
+    const tip = `分类：${r.cat.label}（含 ${r.items.length} 项库存）`;
+    if(!confirm("永久删除「"+tip+"」？\n此操作不可恢复。")) return;
+    DB.recycleBin = DB.recycleBin.filter(x=>x.id!==r.id);
+    save();
+    renderRecycleList(); renderRecycleBadge();
+    toast("已永久删除");
+  });
+}
+
+document.getElementById("recycleEmptyBtn").onclick=()=>{
+  if(DB.recycleBin.length===0) return;
+  if(!confirm("清空回收站所有 " +DB.recycleBin.length+ " 项？\n此操作不可恢复。")) return;
+  DB.recycleBin = [];
+  save();
+  renderRecycleList(); renderRecycleBadge();
+  toast("已清空 🚮");
+};
 
 /* ---------- 添加自定义分类 ---------- */
 let newCatPickedEm = "📦";
@@ -1146,6 +1357,7 @@ function renderAll(){
   renderFlowFilter(); renderFlow();
   renderStats();
   renderCatManage(); renderCustomCatList();
+  renderRecycleBadge();
   initSettings();
 }
 renderAll();

@@ -91,14 +91,16 @@
   .inv-row .t1{font-weight:800;font-size:15px;color:var(--ink);display:flex;align-items:center;gap:6px;}
   .inv-row .t1 .name{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .inv-row .t2{font-size:12px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
-  .inv-row .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+  .inv-row .right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
   .inv-row .qty{font-size:22px;font-weight:800;color:var(--accent-ink);font-variant-numeric:tabular-nums;line-height:1;}
   .inv-row.low .qty{color:var(--coral-ink);}
   .inv-row.expired .qty{color:var(--coral-ink);}
-  .inv-row .ctrl{display:flex;gap:5px;}
-  .qbtn{width:28px;height:28px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-soft);font-size:17px;font-weight:800;color:var(--accent-ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
-  .qbtn:active{transform:scale(.92);}
-  .qbtn.m{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .inv-row .spec-line{font-size:11px;color:var(--muted);font-weight:600;line-height:1;}
+  .inv-row .acts{display:flex;flex-direction:row;gap:5px;align-items:center;flex-shrink:0;margin-left:2px;}
+  .act-btn{width:28px;height:28px;border-radius:8px;border:1px solid var(--line-soft);background:var(--surface-2);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;line-height:1;transition:all .12s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  .act-btn:active{transform:scale(.90);}
+  .act-btn.add{background:rgba(93,140,97,.10);border-color:rgba(93,140,97,.35);color:var(--accent-ink);}
+  .act-btn.del{background:rgba(216,124,95,.08);border-color:rgba(216,124,95,.3);color:var(--coral-ink);}
 
   .tag{display:inline-block;background:var(--accent-soft);color:var(--accent-ink);border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;}
   .tag.warn{background:var(--coral-soft);color:var(--coral-ink);}
@@ -753,10 +755,12 @@ function renderStock(){
         </div>
         <div class="right">
           <div class="qty">${it.qty}</div>
-          <div class="ctrl">
-            <button class="qbtn" data-dec="${it.id}">−</button>
-            <button class="qbtn m" data-inc="${it.id}">+</button>
-          </div>
+          <div class="spec-line">${escapeHtml(it.spec||"1件")}</div>
+        </div>
+        <div class="acts">
+          <button class="act-btn edit" data-edit="${it.id}" title="编辑">✏️</button>
+          <button class="act-btn del" data-delinv="${it.id}" title="删除">🗑</button>
+          <button class="act-btn add" data-addnew="${it.cat}" title="新建">＋</button>
         </div>
       </div>
       <div class="swipe-actions">
@@ -766,9 +770,42 @@ function renderStock(){
     </div>`;
   });
   box.innerHTML = html;
-  box.querySelectorAll("[data-inc]").forEach(b=>b.onclick=e=>{e.stopPropagation(); adjustQty(b.dataset.inc, +1);});
-  box.querySelectorAll("[data-dec]").forEach(b=>b.onclick=e=>{e.stopPropagation(); adjustQty(b.dataset.dec, -1);});
-  box.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openInvSheet(b.dataset.edit));
+  box.querySelectorAll("[data-edit]").forEach(b=>b.onclick=e=>{e.stopPropagation(); openInvSheet(b.dataset.edit);});
+  box.querySelectorAll("[data-delinv]").forEach(b=>{
+    const btn = b;
+    const origHTML = btn.innerHTML;
+    const origStyle = btn.getAttribute("style")||"";
+    let armT = null;
+    btn.onclick = e => {
+      e.stopPropagation();
+      if(btn.dataset.arm==="1"){
+        clearTimeout(armT);
+        const it = DB.inventory.find(x=>x.id===btn.dataset.delinv);
+        if(it){
+          sendToRecycle("inventory", {id:it.id, cat:it.cat, name:it.name}, it);
+          DB.inventory = DB.inventory.filter(x=>x.id!==it.id);
+          save();
+          renderStockFilter(); renderStock(); renderStats(); renderFlow(); renderAlerts();
+          toast("已删除到回收站 🗑");
+        }
+        return;
+      }
+      // 第一次：进入待确认
+      btn.dataset.arm = "1";
+      btn.innerHTML = "✓";
+      btn.setAttribute("style", "background:var(--coral-ink);border:1.5px solid var(--coral-ink);color:#fff;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;animation:armPulse 1s ease-in-out infinite;padding:0;line-height:1;");
+      armT = setTimeout(()=>{
+        btn.dataset.arm = "0";
+        btn.innerHTML = origHTML;
+        btn.setAttribute("style", origStyle);
+      }, 3000);
+    };
+  });
+  box.querySelectorAll("[data-addnew]").forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    invFormCat = b.dataset.addnew;
+    openInvSheet(null, true);
+  });
   // 左滑：编辑/删除
   box.querySelectorAll(".swipe-wrap").forEach(wrap=>{
     const id = wrap.dataset.sku;
@@ -786,18 +823,6 @@ function renderStock(){
       }
     });
   });
-}
-
-function adjustQty(id, delta){
-  const it = DB.inventory.find(x=>x.id===id);
-  if(!it) return;
-  const before = it.qty;
-  it.qty = Math.max(0, it.qty + delta);
-  if(it.qty===before) return;
-  it.updatedAt = Date.now();
-  it.logs.push({id:uid("l"), ts:Date.now(), delta, note:""});
-  save();
-  renderStock(); renderStats(); renderFlow();
 }
 
 /* ---------- 库存新增/编辑 sheet ---------- */
@@ -840,7 +865,7 @@ function resetCoverUI(initialCatKey){
   clr.style.display="none";
   paintCoverPlaceholder();
 }
-function openInvSheet(id){
+function openInvSheet(id, preserveCat){
   editInvId = id;
   const isEdit = !!id;
   document.getElementById("invSheetTitle").textContent = isEdit?"编辑库存":"添加库存";
@@ -870,9 +895,9 @@ function openInvSheet(id){
       resetCoverUI(invFormCat);
     }
   }else{
-    invFormCat = "kibble";
+    if(!preserveCat) invFormCat = "kibble";
     ["invName","invSpec","invQty","invThreshold","invExpiry","invNote"].forEach(i=>document.getElementById(i).value="");
-    resetCoverUI("kibble");
+    resetCoverUI(invFormCat);
   }
   renderInvTypeGrid(); renderInvSug();
   document.getElementById("invMask").classList.add("show");

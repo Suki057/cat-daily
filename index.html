@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#5D8C61" />
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<link rel="shortcut icon" href="assets/favicon.ico" />
 <title>猫猫日常 · 库存</title>
 <style>
   :root{
@@ -191,8 +195,12 @@
 
   .cat-manage{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .cat-chip{display:flex;align-items:center;gap:7px;background:var(--surface-2);border:1.5px solid var(--line-soft);border-radius:20px;padding:7px 13px;font-weight:700;cursor:pointer;color:var(--ink-soft);}
-  .cat-chip .x{color:var(--muted);font-size:14px;font-weight:800;margin-left:6px;padding:2px 8px;border-radius:50%;cursor:pointer;user-select:none;-webkit-user-select:none;line-height:1.4;touch-action:manipulation;transition:all .15s;pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;min-width:22px;min-height:22px;}
+  .cat-chip .x{color:var(--muted);font-size:14px;font-weight:800;margin-left:6px;padding:2px 8px;border-radius:50%;cursor:pointer;user-select:none;-webkit-user-select:none;line-height:1.4;touch-action:manipulation;transition:all .15s;pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;position:relative;z-index:2;}
   .cat-chip .x:hover,.cat-chip .x:active{background:rgba(216,124,95,.16);color:var(--coral-ink);transform:scale(1.08);}
+  .cat-chip .x.confirming{background:var(--coral);color:#fff;padding:2px 10px;border-radius:14px;font-size:12px;min-width:50px;animation:pulse 1s ease-in-out infinite;}
+  .cat-chip .x.confirming::before{content:"确认";margin-right:2px;}
+  .cat-chip .x.confirming::after{content:"✕";font-size:14px;}
+  @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
   .cat-chip.active{border-color:var(--accent);color:var(--accent-ink);background:#fff;box-shadow:var(--shadow-xs);}
 
   .empty{text-align:center;color:var(--muted);padding:30px 14px;font-size:14px;border:1.5px dashed var(--line-soft);border-radius:var(--radius-sm);margin-top:4px;}
@@ -1005,7 +1013,6 @@ function sendCategoryToRecycle(cat){
 function sendCatToRecycle(catId){
   const cat = DB.cats.find(x=>x.id===catId);
   if(!cat) return;
-  if(!confirm("删除猫咪「"+cat.name+"」？\n关联的库存和护理记录也会移入回收站。")) return;
   // 1) 备份该猫的库存条目
   const invItems = DB.inventory.filter(it=>it.catId===catId).map(it=>({...it, logs:[...(it.logs||[])]}));
   // 2) 备份该猫的护理记录
@@ -1508,8 +1515,37 @@ function renderCatManage(){
     const el=document.createElement("div");
     el.className="cat-chip"+(c.id===DB.activeCat?" active":"");
     el.innerHTML=`<span style="width:9px;height:9px;border-radius:50%;background:${c.color};display:inline-block"></span>${escapeHtml(c.name)}<span class="x" data-delcat="${c.id}" title="删除这只猫咪" style="touch-action:manipulation;">✕</span>`;
-    el.querySelector("[data-delcat]").onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(e.stopImmediatePropagation) e.stopImmediatePropagation(); sendCatToRecycle(c.id); };
-    el.onclick=()=>{ DB.activeCat=c.id; save(); renderCatPill(); renderCatManage(); renderStock(); renderFlow(); renderStats(); renderAlerts(); };
+    // 两段式删除：第一次点 = 进入"确认"状态，第二次点 = 真正删除
+    // 3 秒没动作自动取消
+    const xBtn = el.querySelector("[data-delcat]");
+    xBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+      if(xBtn.classList.contains("confirming")){
+        // 第二次点击：真正执行删除
+        clearTimeout(xBtn._t);
+        xBtn.classList.remove("confirming");
+        sendCatToRecycle(c.id);
+        return;
+      }
+      // 第一次点击：进入确认状态
+      // 先重置其他正在 confirming 的按钮
+      box.querySelectorAll(".x.confirming").forEach(b=>{
+        if(b!==xBtn){ clearTimeout(b._t); b.classList.remove("confirming"); }
+      });
+      xBtn.classList.add("confirming");
+      xBtn._t = setTimeout(()=>{
+        xBtn.classList.remove("confirming");
+        xBtn._t = null;
+      }, 3000);
+    });
+    // chip 本体点击 = 切换 active
+    el.addEventListener("click",(e)=>{
+      // 如果点的是 ✕，不触发
+      if(e.target.closest("[data-delcat]")) return;
+      DB.activeCat=c.id; save(); renderCatPill(); renderCatManage(); renderStock(); renderFlow(); renderStats(); renderAlerts();
+    });
     box.appendChild(el);
   });
 }

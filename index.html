@@ -1220,10 +1220,19 @@ function renderRecycleList(){
 
 // 底部两个大按钮：两段式确认
 function armBigBtn(btn, onConfirm, danger){
+  // 第二次点击：执行 + 还原样式
   if(btn.dataset.arm==="1"){
     btn.dataset.arm="0";
     clearTimeout(btn._t);
+    // 先保存当前样式供 onConfirm 期间可能要做的渲染用
+    const origHTML = btn._origHTML || btn.innerHTML;
+    const origStyle = btn._origStyle || btn.getAttribute("style")||"";
     onConfirm();
+    // 如果按钮还在文档里（未重建），则还原样式
+    if(document.body.contains(btn)){
+      btn.innerHTML = origHTML;
+      btn.setAttribute("style", origStyle);
+    }
     return;
   }
   btn.dataset.arm="1";
@@ -1256,6 +1265,9 @@ document.getElementById("recycleRecoverAllBtn").onclick=()=>{
   if(DB.recycleBin.length===0) return;
   armBigBtn(document.getElementById("recycleRecoverAllBtn"), ()=>{
     DB.recycleBin.slice().forEach(r=>recoverFromRecycle(r.id));
+    // 兜底再渲染一次（单条 recoverFromRecycle 内已 render，这里确保最新状态）
+    renderAll();
+    renderRecycleList(); renderRecycleBadge();
     toast("已全部恢复 ↩️");
   }, false);
 };

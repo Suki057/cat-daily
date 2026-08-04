@@ -237,12 +237,17 @@
   </div>
 </div>
 
-<!-- ===== 流水 ===== -->
+<!-- ===== 记录 ===== -->
 <div class="content hidden" id="tab-flow">
   <div class="card">
-    <h2><span class="em">📜</span> 流水</h2>
+    <h2><span class="em">🪞</span> 护理记录</h2>
+    <div id="careLogList" style="min-height:60px;"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="em">🧴</span> 日用品</h2>
     <div class="filter-row" id="flowFilter"></div>
-    <div id="flowList"></div>
+    <div id="flowList" style="min-height:60px;"></div>
   </div>
 </div>
 
@@ -299,7 +304,7 @@
 <!-- bottom nav -->
 <div class="tabbar">
   <div class="tab active" data-tab="stock"><div class="em">📦</div>库存</div>
-  <div class="tab" data-tab="flow"><div class="em">📜</div>流水</div>
+  <div class="tab" data-tab="flow"><div class="em">📜</div>记录</div>
   <div class="tab" data-tab="stats"><div class="em">📊</div>统计</div>
   <div class="tab" data-tab="me"><div class="em">🐈</div>我的</div>
 </div>
@@ -334,9 +339,8 @@
     <input id="invName" placeholder="如：渴望鸡、巅峰罐、福来恩…" />
     <div class="suggestions" id="invSug"></div>
 
-    <label>品牌 / 规格（可选）</label>
-    <input id="invBrand" placeholder="品牌（如：渴望）" />
-    <input id="invSpec" placeholder="规格（如：5kg/袋、6 罐/盒…）" style="margin-top:8px;" />
+    <label>规格 <span style="font-weight:500;color:var(--muted);">（可选，如：5kg/袋、6 罐/盒）</span></label>
+    <input id="invSpec" placeholder="如：5kg/袋、6 罐/盒…" />
 
     <label>数量</label>
     <input id="invQty" type="number" min="0" step="1" placeholder="本 SKU 当前总数量" />
@@ -732,7 +736,6 @@ function openInvSheet(id){
     const it = DB.inventory.find(x=>x.id===id);
     invFormCat = it.cat;
     document.getElementById("invName").value = it.name||"";
-    document.getElementById("invBrand").value = it.brand||"";
     document.getElementById("invSpec").value = it.spec||"";
     document.getElementById("invQty").value = it.qty;
     document.getElementById("invThreshold").value = it.threshold||"";
@@ -750,7 +753,7 @@ function openInvSheet(id){
     }
   }else{
     invFormCat = "kibble";
-    ["invName","invBrand","invSpec","invQty","invThreshold","invExpiry","invNote"].forEach(i=>document.getElementById(i).value="");
+    ["invName","invSpec","invQty","invThreshold","invExpiry","invNote"].forEach(i=>document.getElementById(i).value="");
     resetCoverUI("kibble");
   }
   renderInvTypeGrid(); renderInvSug();
@@ -805,7 +808,6 @@ document.getElementById("invMask").onclick=e=>{ if(e.target.id==="invMask") clos
 document.getElementById("invSaveBtn").onclick=()=>{
   const name = document.getElementById("invName").value.trim();
   if(!name){ toast("请填写名称"); return; }
-  const brand = document.getElementById("invBrand").value.trim();
   const spec = document.getElementById("invSpec").value.trim() || "1 件";
   const qty = Math.max(0, +document.getElementById("invQty").value || 0);
   const threshold = Math.max(0, +document.getElementById("invThreshold").value || 0);
@@ -1064,17 +1066,19 @@ function renderCustomCatList(){
   });
 }
 
-/* ---------- 流水 ---------- */
+/* ---------- 记录页：护理记录 + 日用品 ---------- */
 let flowFilter="all";
 function renderFlowFilter(){
   const row=document.getElementById("flowFilter"); row.innerHTML="";
-  [["all","全部"],["inv","库存变动"],["care","护理打卡"]].forEach(([k,lb])=>{
+  [["all","全部"],["in","入库"],["out","消耗"]].forEach(([k,lb])=>{
     const c=document.createElement("div");
     c.className="chip"+(k===flowFilter?" active":"");
     c.textContent=lb; c.onclick=()=>{flowFilter=k; renderFlowFilter(); renderFlow();};
     row.appendChild(c);
   });
 }
+
+// 日用品（库存变动）流水分组渲染
 function renderFlow(){
   const box=document.getElementById("flowList"); box.innerHTML="";
 
@@ -1084,17 +1088,15 @@ function renderFlow(){
       invEvents.push({...l, _kind:"inv", _cat:it.cat, _name:it.name, _spec:it.spec, _itemId:it.id, _cover:it.cover});
     });
   });
-  const careEvents = DB.careLogs.filter(c=>c.catId===DB.activeCat)
-    .map(c=>({...c, _kind:"care", _t:CARE[c.type]||CARE.other}));
 
-  let all = invEvents.concat(careEvents).filter(e=>{
-    if(flowFilter==="inv") return e._kind==="inv";
-    if(flowFilter==="care") return e._kind==="care";
+  let all = invEvents.filter(e=>{
+    if(flowFilter==="in") return e.delta>0;
+    if(flowFilter==="out") return e.delta<0;
     return true;
   });
   all.sort((a,b)=>b.ts-a.ts);
   if(all.length===0){
-    box.innerHTML='<div class="empty"><span class="em">📜</span>还没有流水记录</div>';
+    box.innerHTML='<div class="empty"><span class="em">🧴</span>还没有日用品记录</div>';
     return;
   }
   const groups={};
@@ -1104,31 +1106,52 @@ function renderFlow(){
     const arr=groups[k].sort((a,b)=>b.ts-a.ts);
     html += `<div class="day-group"><div class="day-head"><span>${fmtDate(arr[0].ts)}</span><span>${arr.length} 条</span></div>`;
     arr.forEach(e=>{
-      if(e._kind==="inv"){
-        const c = getCat(e._cat);
-        const isAdd = e.delta>=0;
-        const sign = isAdd?"+":"";
-        html += `<div class="ev">
-          ${catIconHTML(e._cat, e._cover)}
-          <div class="body">
-            <div class="t1">${escapeHtml(e._name||c.label)}
-              <span class="tag">${escapeHtml(c.label)}</span>
-              ${e._spec?`<span class="tag">${escapeHtml(e._spec)}</span>`:""}
-            </div>
-            <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
+      const c = getCat(e._cat);
+      const isAdd = e.delta>=0;
+      const sign = isAdd?"+":"";
+      html += `<div class="ev">
+        ${catIconHTML(e._cat, e._cover)}
+        <div class="body">
+          <div class="t1">${escapeHtml(e._name||c.label)}
+            <span class="tag">${escapeHtml(c.label)}</span>
+            ${e._spec?`<span class="tag">${escapeHtml(e._spec)}</span>`:""}
           </div>
-          <div class="delta ${isAdd?'in':'out'}">${sign}${e.delta}</div>
-        </div>`;
-      } else {
-        const t=e._t;
-        html += `<div class="ev">
-          <div class="ic" style="background:${t.color}22">${t.em}</div>
-          <div class="body">
-            <div class="t1">${t.label} <span class="tag">${t.em}</span></div>
-            <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
-          </div>
-        </div>`;
-      }
+          <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
+        </div>
+        <div class="delta ${isAdd?'in':'out'}">${sign}${e.delta}</div>
+      </div>`;
+    });
+    html += "</div>";
+  });
+  box.innerHTML = html;
+}
+
+// 护理打卡（洗澡/驱虫/体内驱虫/体外驱虫）
+function renderCareLog(){
+  const box=document.getElementById("careLogList"); box.innerHTML="";
+
+  const careEvents = DB.careLogs.filter(c=>c.catId===DB.activeCat)
+    .map(c=>({...c, _kind:"care", _t:CARE[c.type]||CARE.other}));
+  careEvents.sort((a,b)=>b.ts-a.ts);
+  if(careEvents.length===0){
+    box.innerHTML='<div class="empty"><span class="em">🪞</span>还没有护理打卡，去「统计」页打卡</div>';
+    return;
+  }
+  const groups={};
+  careEvents.forEach(e=>{ const k=dayKey(e.ts); (groups[k]=groups[k]||[]).push(e); });
+  let html="";
+  Object.keys(groups).sort((a,b)=>new Date(b)-new Date(a)).forEach(k=>{
+    const arr=groups[k].sort((a,b)=>b.ts-a.ts);
+    html += `<div class="day-group"><div class="day-head"><span>${fmtDate(arr[0].ts)}</span><span>${arr.length} 条</span></div>`;
+    arr.forEach(e=>{
+      const t=e._t;
+      html += `<div class="ev">
+        <div class="ic" style="background:${t.color}22">${t.em}</div>
+        <div class="body">
+          <div class="t1">${t.label} <span class="tag">${t.em}</span></div>
+          <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
+        </div>
+      </div>`;
     });
     html += "</div>";
   });
@@ -1205,7 +1228,7 @@ function renderStats(){
   cb.querySelectorAll("[data-care]").forEach(b=>b.onclick=()=>{
     const key = b.dataset.care;
     DB.careLogs.push({id:uid("cl"), catId:DB.activeCat, type:key, ts:Date.now(), note:""});
-    save(); renderStats(); renderFlow(); toast("已打卡 ✅");
+    save(); renderStats(); renderFlow(); renderCareLog(); toast("已打卡 ✅");
   });
 
   const cbox = document.getElementById("catSummary");
@@ -1344,7 +1367,7 @@ document.querySelectorAll(".tab").forEach(t=>{
       document.getElementById("tab-"+k).classList.toggle("hidden",k!==tab);
     });
     if(tab==="stock"){ renderAlerts(); renderStock(); }
-    if(tab==="flow") renderFlow();
+    if(tab==="flow"){ renderFlowFilter(); renderFlow(); renderCareLog(); }
     if(tab==="stats") renderStats();
     if(tab==="me"){ renderCatManage(); initSettings(); renderCustomCatList(); }
   };
@@ -1354,7 +1377,7 @@ document.querySelectorAll(".tab").forEach(t=>{
 function renderAll(){
   renderCatPill();
   renderStockFilter(); renderStock(); renderAlerts();
-  renderFlowFilter(); renderFlow();
+  renderFlowFilter(); renderFlow(); renderCareLog();
   renderStats();
   renderCatManage(); renderCustomCatList();
   renderRecycleBadge();

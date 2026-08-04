@@ -166,6 +166,14 @@
   .care-row .go{background:var(--accent);color:#fff;border:none;border-radius:11px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;}
   .care-row .go:active{transform:scale(.95);}
 
+  /* 左滑露出编辑/删除 */
+  .swipe-wrap{position:relative;overflow:hidden;border-radius:14px;margin-bottom:9px;}
+  .swipe-front{position:relative;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:14px;transition:transform .18s ease;touch-action:pan-y;}
+  .swipe-actions{position:absolute;top:0;right:0;bottom:0;display:flex;align-items:stretch;width:160px;transform:translateX(100%);}
+  .swipe-actions .act{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;color:#fff;font-weight:700;font-size:13px;border:none;cursor:pointer;}
+  .swipe-actions .act.edit{background:#5D8C61;}
+  .swipe-actions .act.del{background:#D87C5F;}
+
   .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
   .bar-row .nm{width:90px;font-size:13px;font-weight:700;color:var(--ink-soft);flex-shrink:0;}
   .bar-track{flex:1;height:15px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;}
@@ -220,9 +228,9 @@
 <body>
 
 <div class="appbar">
-  <h1>🐱 猫猫日常</h1>
-  <div class="sub">家里的口粮、零食、驱虫药…清清楚楚</div>
-  <div class="cat-pill" id="catPill"><span class="dot"></span><span id="catPillName">默认猫咪</span> ▾</div>
+  <h1 id="appbarTitle">🐱 猫猫日常</h1>
+  <div class="sub" id="appbarSub">家里的口粮、零食、驱虫药…清清楚楚</div>
+  <div class="cat-pill" id="catPill"><span class="dot"></span><span id="catPillName">＋ 添加猫咪</span> ▾</div>
 </div>
 
 <!-- ===== 库存 ===== -->
@@ -270,7 +278,7 @@
 <!-- ===== 我的 ===== -->
 <div class="content hidden" id="tab-me">
   <div class="card">
-    <h2><span class="em">🐈</span> 猫咪档案</h2>
+    <h2 id="catsSectionTitle"><span class="em">🐈</span> 猫咪档案</h2>
     <div class="cat-manage" id="catManage"></div>
     <button class="btn ghost sm" id="addCatBtn" style="margin-top:14px;">＋ 添加猫咪</button>
   </div>
@@ -452,20 +460,22 @@ function load(){
 }
 function ensureShape(r){
   const d = Object.assign({
-    cats:[{id:"c1",name:"默认猫咪",color:"#5D8C61"}],
-    activeCat:"c1",
+    cats:[],
+    activeCat:null,
     settings:{bath:30,dewi:90,dewe:30},
     library:{},
     inventory:[],
     careLogs:[],
     customCats:[],
-    recycleBin:[]
+    recycleBin:[],
+    appSettings:{title:"🐱 猫猫日常", subtitle:"家里的口粮、零食、驱虫药…清清楚楚", catsSectionTitle:"🐈 猫咪档案"}
   }, r||{});
   d.customCats = d.customCats||[];
   d.library = d.library||{};
   d.careLogs = d.careLogs||[];
   d.inventory = d.inventory||[];
   d.recycleBin = d.recycleBin || [];
+  d.appSettings = d.appSettings || {title:"🐱 猫猫日常", subtitle:"家里的口粮、零食、驱虫药…清清楚楚", catsSectionTitle:"🐈 猫咪档案"};
   // 7 天自动清理回收站
   const cutoff = Date.now() - 7*24*3600*1000;
   d.recycleBin = d.recycleBin.filter(x => (x.deletedAt||0) > cutoff);
@@ -478,6 +488,9 @@ function ensureShape(r){
       else it.cat = "kibble";  // can/stick/snack/food/other 等归并到「猫粮」
     }
   });
+  // 剔除旧版"默认猫咪"自动档案，并修正 activeCat 引用
+  d.cats = (d.cats||[]).filter(c => c && c.id && c.name !== "默认猫咪");
+  if(d.activeCat && !d.cats.find(c=>c.id===d.activeCat)) d.activeCat = d.cats[0] ? d.cats[0].id : null;
   return d;
 }
 function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
@@ -493,11 +506,71 @@ function toast(msg){
   clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1600);
 }
 function uid(p){ return p+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+// 删除任意元素到回收站
+function sendToRecycle(kind, item, snapshot){
+  // kind: "inventory" | "care" | "cat"
+  DB.recycleBin = DB.recycleBin || [];
+  DB.recycleBin.push({
+    id: uid("rb"),
+    kind,
+    item,                 // 原始 id 等关键信息
+    snapshot: snapshot || JSON.parse(JSON.stringify(item)),  // 完整拷贝
+    deletedAt: Date.now(),
+  });
+  save();
+}
+
+// 左滑：把外层 .swipe-wrap 内的 .swipe-front 横向滑动，露出右侧编辑/删除
+// 用法：bindSwipeRow(wrap, {onEdit, onDelete, onTap})
+function bindSwipeRow(wrap, handlers){
+  const front = wrap.querySelector(".swipe-front");
+  let startX=0, startY=0, dx=0, dy=0, dragging=false, open=false;
+  const ACTIONS_W = 160;
+  const THRESHOLD = 70;
+  function reset(){ front.style.transform=""; open=false; }
+  function closeAll(){
+    document.querySelectorAll(".swipe-wrap .swipe-front").forEach(f=>{ f.style.transform=""; });
+    document.querySelectorAll(".swipe-wrap.open").forEach(w=>w.classList.remove("open"));
+    open=false;
+  }
+  front.addEventListener("touchstart", e=>{
+    const t = e.touches[0]; startX=t.clientX; startY=t.clientY; dx=0; dy=0; dragging=true;
+    closeAll();
+  }, {passive:true});
+  front.addEventListener("touchmove", e=>{
+    if(!dragging) return;
+    const t = e.touches[0]; dx = t.clientX-startX; dy = t.clientY-startY;
+    // 横向滑动优先
+    if(Math.abs(dx) < Math.abs(dy) || Math.abs(dx) < 8){ return; }
+    e.preventDefault();
+    let x = Math.min(0, Math.max(-ACTIONS_W, dx));
+    front.style.transform = `translateX(${x}px)`;
+  }, {passive:false});
+  front.addEventListener("touchend", e=>{
+    if(!dragging) return; dragging=false;
+    if(dx < -THRESHOLD){ front.style.transform = `translateX(${-ACTIONS_W}px)`; wrap.classList.add("open"); open=true; }
+    else { reset(); }
+  });
+  // 鼠标拖拽（PC 调试）
+  let md=false, mx0=0;
+  front.addEventListener("mousedown", e=>{ md=true; mx0=e.clientX; dx=0; closeAll(); });
+  window.addEventListener("mousemove", e=>{ if(!md) return; dx=e.clientX-mx0; if(Math.abs(dx)<8) return; let x=Math.min(0,Math.max(-ACTIONS_W,dx)); front.style.transform=`translateX(${x}px)`; });
+  window.addEventListener("mouseup", e=>{ if(!md) return; md=false; if(dx<-THRESHOLD){ front.style.transform=`translateX(${-ACTIONS_W}px)`; wrap.classList.add("open"); open=true;} else reset(); });
+  // 编辑 / 删除按钮
+  const editBtn = wrap.querySelector(".swipe-actions .edit");
+  const delBtn  = wrap.querySelector(".swipe-actions .del");
+  if(editBtn && handlers.onEdit) editBtn.onclick = e=>{ e.stopPropagation(); reset(); handlers.onEdit(); };
+  if(delBtn && handlers.onDelete) delBtn.onclick = e=>{ e.stopPropagation(); reset(); handlers.onDelete(); };
+  // 点空白处收回
+  wrap.addEventListener("click", e=>{ if(open && !e.target.closest(".swipe-actions")) reset(); });
+}
 function nowLocalInput(){
   const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
   return d.toISOString().slice(0,16);
 }
 function fmtTime(ts){
+function fmtLocal(ts){ const d=new Date(ts); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
   const d=new Date(ts), n=new Date();
   const sameDay = d.toDateString()===n.toDateString();
   const pad=x=>String(x).padStart(2,"0");
@@ -643,24 +716,30 @@ function renderStock(){
     const isExpired = daysExp!==null && daysExp<=0;
     const isLow = it.threshold>0 && it.qty<=it.threshold;
     const rowCls = "inv-row"+(isLow?" low":"")+(isExpired?" expired":"");
-    html += `<div class="${rowCls}" data-id="${it.id}">
-      ${catIconHTML(it.cat, it.cover)}
-      <div class="body" data-edit="${it.id}">
-        <div class="t1"><span class="name">${escapeHtml(it.name||c.label)}</span>
-          ${it.brand?`<span class="tag">${escapeHtml(it.brand)}</span>`:""}
-          ${isLow?`<span class="tag warn">⚠ 库存低</span>`:""}
+    html += `<div class="swipe-wrap" data-sku="${it.id}">
+      <div class="swipe-front ${rowCls}" data-id="${it.id}">
+        ${catIconHTML(it.cat, it.cover)}
+        <div class="body" data-edit="${it.id}">
+          <div class="t1"><span class="name">${escapeHtml(it.name||c.label)}</span>
+            ${it.brand?`<span class="tag">${escapeHtml(it.brand)}</span>`:""}
+            ${isLow?`<span class="tag warn">⚠ 库存低</span>`:""}
+          </div>
+          <div class="t2">
+            ${it.spec?escapeHtml(it.spec):""}
+            ${it.expiry?`<span class="tag ${isExpired?'warn':'amber'}">${isExpired?'已过期':'至 '+escapeHtml(it.expiry)}${daysExp!==null&&!isExpired?'（剩'+(daysExp)+'天）':''}</span>`:""}
+          </div>
         </div>
-        <div class="t2">
-          ${it.spec?escapeHtml(it.spec):""}
-          ${it.expiry?`<span class="tag ${isExpired?'warn':'amber'}">${isExpired?'已过期':'至 '+escapeHtml(it.expiry)}${daysExp!==null&&!isExpired?'（剩'+(daysExp)+'天）':''}</span>`:""}
+        <div class="right">
+          <div class="qty">${it.qty}</div>
+          <div class="ctrl">
+            <button class="qbtn" data-dec="${it.id}">−</button>
+            <button class="qbtn m" data-inc="${it.id}">+</button>
+          </div>
         </div>
       </div>
-      <div class="right">
-        <div class="qty">${it.qty}</div>
-        <div class="ctrl">
-          <button class="qbtn" data-dec="${it.id}">−</button>
-          <button class="qbtn m" data-inc="${it.id}">+</button>
-        </div>
+      <div class="swipe-actions">
+        <button class="act edit">✏️ 编辑</button>
+        <button class="act del">🗑 删除</button>
       </div>
     </div>`;
   });
@@ -668,6 +747,23 @@ function renderStock(){
   box.querySelectorAll("[data-inc]").forEach(b=>b.onclick=e=>{e.stopPropagation(); adjustQty(b.dataset.inc, +1);});
   box.querySelectorAll("[data-dec]").forEach(b=>b.onclick=e=>{e.stopPropagation(); adjustQty(b.dataset.dec, -1);});
   box.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openInvSheet(b.dataset.edit));
+  // 左滑：编辑/删除
+  box.querySelectorAll(".swipe-wrap").forEach(wrap=>{
+    const id = wrap.dataset.sku;
+    bindSwipeRow(wrap, {
+      onEdit: ()=> openInvSheet(id),
+      onDelete: ()=>{
+        const it = DB.inventory.find(x=>x.id===id);
+        if(!it) return;
+        if(!confirm("确定删除「"+(it.name||"该库存")+"」？删除后可在回收站恢复。")) return;
+        sendToRecycle("inventory", {id:it.id, cat:it.cat, name:it.name}, it);
+        DB.inventory = DB.inventory.filter(x=>x.id!==id);
+        save();
+        renderStockFilter(); renderStock(); renderStats(); renderFlow(); renderAlerts();
+        toast("已删除到回收站 🗑");
+      }
+    });
+  });
 }
 
 function adjustQty(id, delta){
@@ -1145,17 +1241,40 @@ function renderCareLog(){
     html += `<div class="day-group"><div class="day-head"><span>${fmtDate(arr[0].ts)}</span><span>${arr.length} 条</span></div>`;
     arr.forEach(e=>{
       const t=e._t;
-      html += `<div class="ev">
-        <div class="ic" style="background:${t.color}22">${t.em}</div>
-        <div class="body">
-          <div class="t1">${t.label} <span class="tag">${t.em}</span></div>
-          <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
+      html += `<div class="swipe-wrap" data-care="${e.id}">
+        <div class="swipe-front ev">
+          <div class="ic" style="background:${t.color}22">${t.em}</div>
+          <div class="body">
+            <div class="t1">${t.label} <span class="tag">${t.em}</span></div>
+            <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
+          </div>
+        </div>
+        <div class="swipe-actions">
+          <button class="act edit">✏️ 编辑</button>
+          <button class="act del">🗑 删除</button>
         </div>
       </div>`;
     });
     html += "</div>";
   });
   box.innerHTML = html;
+  // 护理记录左滑：编辑/删除
+  box.querySelectorAll(".swipe-wrap").forEach(wrap=>{
+    const id = wrap.dataset.care;
+    bindSwipeRow(wrap, {
+      onEdit: ()=> openCareEditSheet(id),
+      onDelete: ()=>{
+        const it = DB.careLogs.find(x=>x.id===id);
+        if(!it) return;
+        if(!confirm("确定删除这条护理打卡？删除后可在回收站恢复。")) return;
+        sendToRecycle("care", {id:it.id, type:it.type, ts:it.ts}, it);
+        DB.careLogs = DB.careLogs.filter(x=>x.id!==id);
+        save();
+        renderCareLog(); renderStats();
+        toast("已删除到回收站 🗑");
+      }
+    });
+  });
 }
 
 /* ---------- 统计 ---------- */
@@ -1231,6 +1350,28 @@ function renderStats(){
     save(); renderStats(); renderFlow(); renderCareLog(); toast("已打卡 ✅");
   });
 
+  // 编辑护理打卡：弹层改时间/备注
+  function openCareEditSheet(id){
+    const it = DB.careLogs.find(x=>x.id===id);
+    if(!it) return;
+    const t = CARE[it.type] || CARE.other;
+    let picker = prompt(`编辑 ${t.label}\n新时间（YYYY-MM-DD HH:mm）留空保持不变：`, fmtLocal(it.ts));
+    if(picker===null) return;
+    picker = picker.trim();
+    if(picker){
+      const d = new Date(picker);
+      if(isNaN(d.getTime())){ toast("时间格式不对"); return; }
+      it.ts = d.getTime();
+    }
+    const note = prompt("备注（留空保持不变）：", it.note||"");
+    if(note===null) return;
+    it.note = note.trim();
+    save();
+    renderStats(); renderFlow(); renderCareLog();
+    toast("已更新 ✅");
+  }
+  window.openCareEditSheet = openCareEditSheet;
+
   const cbox = document.getElementById("catSummary");
   const totals={}; let max=0;
   myInventory().forEach(it=>{
@@ -1270,12 +1411,25 @@ function renderAlerts(){
 
 /* ---------- 猫咪档案 ---------- */
 function renderCatPill(){
-  const c=DB.cats.find(x=>x.id===DB.activeCat)||DB.cats[0];
-  document.getElementById("catPillName").textContent=c.name;
-  document.querySelector("#catPill .dot").style.background=c.color;
+  const c = DB.cats.find(x=>x.id===DB.activeCat) || DB.cats[0];
+  if(!c){
+    document.getElementById("catPillName").textContent = "＋ 添加猫咪";
+    const dot = document.querySelector("#catPill .dot");
+    if(dot) dot.style.background = "transparent";
+    document.title = (DB.appSettings?.title||"🐱 猫猫日常").replace(/<[^>]*>/g,"")+" · 库存";
+    return;
+  }
+  document.getElementById("catPillName").textContent = c.name;
+  const dot = document.querySelector("#catPill .dot");
+  if(dot) dot.style.background = c.color;
+  document.title = (DB.appSettings?.title||"🐱 猫猫日常").replace(/<[^>]*>/g,"")+" · 库存";
 }
 function renderCatManage(){
   const box=document.getElementById("catManage"); box.innerHTML="";
+  if(DB.cats.length===0){
+    box.innerHTML='<div class="empty" style="margin:0 0 8px;"><span class="em">🐾</span>还没有猫咪档案，点下方按钮添加</div>';
+    return;
+  }
   DB.cats.forEach(c=>{
     const el=document.createElement("div");
     el.className="cat-chip"+(c.id===DB.activeCat?" active":"");
@@ -1315,7 +1469,11 @@ document.getElementById("catSaveBtn").onclick=()=>{
   const sugs=document.querySelectorAll("#colorBox .sug");
   sugs.forEach((s,i)=>{ if(s.style.background && s.style.background!=="") picked=COLOR_PRESETS[i]; });
   if(editCatId){ const c=DB.cats.find(x=>x.id===editCatId); c.name=nm; c.color=picked; }
-  else { DB.cats.push({id:uid("c"),name:nm,color:picked}); }
+  else {
+    const newCat = {id:uid("c"),name:nm,color:picked};
+    DB.cats.push(newCat);
+    DB.activeCat = newCat.id;
+  }
   save(); closeCatSheet(); renderCatPill(); renderCatManage();
 };
 function closeCatSheet(){ document.getElementById("catMask").classList.remove("show"); }
@@ -1323,6 +1481,28 @@ document.querySelectorAll("[data-close-cat]").forEach(x=>x.onclick=closeCatSheet
 document.getElementById("catMask").onclick=e=>{ if(e.target.id==="catMask") closeCatSheet(); };
 
 /* ---------- 设置 ---------- */
+// 双击改标题：渲染
+function renderAppTitles(){
+  const t = DB.appSettings || (DB.appSettings = {title:"🐱 猫猫日常", subtitle:"家里的口粮、零食、驱虫药…清清楚楚", catsSectionTitle:"🐈 猫咪档案"});
+  document.getElementById("appbarTitle").textContent = t.title || "🐱 猫猫日常";
+  document.getElementById("appbarSub").textContent   = t.subtitle || "家里的口粮、零食、驱虫药…清清楚楚";
+  document.getElementById("catsSectionTitle").innerHTML = `<span class="em">🐈</span> ${escapeHtml(t.catsSectionTitle||"猫咪档案")}`;
+}
+document.getElementById("appbarTitle").ondblclick = ()=>{
+  const v = prompt("修改顶部标题：", DB.appSettings.title);
+  if(v===null) return;
+  DB.appSettings.title = v.trim() || DB.appSettings.title;
+  save(); renderAppTitles(); document.title = DB.appSettings.title.replace(/<[^>]*>/g,"")+" · 库存";
+  toast("已更新 ✅");
+};
+document.getElementById("catsSectionTitle").ondblclick = ()=>{
+  const v = prompt("修改「猫咪档案」标题：", DB.appSettings.catsSectionTitle||"猫咪档案");
+  if(v===null) return;
+  DB.appSettings.catsSectionTitle = v.trim() || DB.appSettings.catsSectionTitle;
+  save(); renderAppTitles();
+  toast("已更新 ✅");
+};
+
 function initSettings(){
   document.getElementById("setBath").value=DB.settings.bath;
   document.getElementById("setDewI").value=DB.settings.dewi;
@@ -1375,6 +1555,7 @@ document.querySelectorAll(".tab").forEach(t=>{
 
 /* ---------- 初始化 ---------- */
 function renderAll(){
+  renderAppTitles();
   renderCatPill();
   renderStockFilter(); renderStock(); renderAlerts();
   renderFlowFilter(); renderFlow(); renderCareLog();

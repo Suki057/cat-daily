@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#5D8C61" />
-<title>猫猫日常 · 记录</title>
+<title>猫猫日常 · 库存</title>
 <style>
   :root{
     --paper:#F5F1E6;
@@ -49,118 +49,136 @@
     padding-top:calc(env(safe-area-inset-top) + 18px);
     box-shadow:0 6px 22px rgba(58,64,52,.18);
   }
-  .appbar::before{
-    content:"";position:absolute;top:-46px;right:-34px;width:170px;height:170px;border-radius:50%;
-    background:radial-gradient(circle, rgba(255,255,255,.30), rgba(255,255,255,0) 70%);
-  }
-  .appbar::after{
-    content:"";position:absolute;bottom:-30px;left:-20px;width:120px;height:120px;border-radius:50%;
-    background:radial-gradient(circle, rgba(242,208,107,.30), rgba(242,208,107,0) 70%);
-  }
+  .appbar::before{content:"";position:absolute;top:-46px;right:-34px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle, rgba(255,255,255,.30), rgba(255,255,255,0) 70%);}
+  .appbar::after{content:"";position:absolute;bottom:-30px;left:-20px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle, rgba(242,208,107,.30), rgba(242,208,107,0) 70%);}
   .appbar h1{margin:0;font-size:21px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center;gap:8px;position:relative;}
   .appbar .sub{font-size:12px;opacity:.92;margin-top:3px;position:relative;font-weight:500;}
-  .cat-pill{
-    display:inline-flex;align-items:center;gap:6px;margin-top:11px;position:relative;
-    background:rgba(255,255,255,.22);padding:5px 13px;border-radius:20px;font-size:13px;font-weight:600;
-    cursor:pointer;border:1px solid rgba(255,255,255,.28);backdrop-filter:blur(6px);
-  }
+  .cat-pill{display:inline-flex;align-items:center;gap:6px;margin-top:11px;position:relative;background:rgba(255,255,255,.22);padding:5px 13px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.28);backdrop-filter:blur(6px);}
   .cat-pill .dot{width:8px;height:8px;border-radius:50%;background:#fff;}
 
   .content{padding:16px;}
-  .card{
-    background:var(--surface);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:18px;
-    box-shadow:var(--shadow-sm);
-    backdrop-filter:blur(14px) saturate(150%);
-    -webkit-backdrop-filter:blur(14px) saturate(150%);
-    margin-bottom:16px;
-  }
-  .card h2{margin:0 0 16px;font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;color:var(--accent-ink);}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-sm);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);margin-bottom:16px;}
+  .card h2{margin:0 0 14px;font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;color:var(--accent-ink);}
   .card h2 .em{font-size:19px;}
+  .card.tight{padding:14px 16px;}
 
-  .type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
-  .type-btn{
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-    background:var(--surface-2);border:2px solid transparent;border-radius:var(--radius-sm);
-    padding:13px 4px;cursor:pointer;transition:.15s;
-  }
-  .type-btn .em{font-size:26px;line-height:1;}
-  .type-btn .lb{font-size:12px;font-weight:700;color:var(--ink-soft);}
-  .type-btn.active{border-color:var(--accent);background:#fff;box-shadow:var(--shadow-xs);transform:translateY(-2px);}
-  .type-btn.active .lb{color:var(--accent-ink);}
+  .filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .chip{background:var(--surface);border:1.5px solid var(--line-soft);border-radius:16px;padding:6px 13px;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:.15s;}
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(93,140,97,.28);}
 
-  label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin:15px 0 7px;}
-  input,select,textarea{
-    width:100%;border:1.5px solid var(--line-soft);border-radius:14px;padding:12px;font-size:15px;
-    background:rgba(255,255,255,.66);color:var(--ink);font-family:inherit;outline:none;transition:.15s;
+  /* 库存列表 */
+  .inv-row{
+    display:flex;align-items:center;gap:12px;
+    background:var(--surface);border:1px solid var(--line);border-radius:18px;
+    padding:13px;margin-bottom:10px;box-shadow:var(--shadow-xs);
+    transition:.15s;
   }
+  .inv-row.low{border-color:rgba(216,124,95,.4);background:rgba(216,124,95,.06);}
+  .inv-row.expired{border-color:rgba(154,77,56,.55);background:rgba(154,77,56,.07);}
+  .inv-row .ic{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+  .inv-row .body{flex:1;min-width:0;}
+  .inv-row .t1{font-weight:800;font-size:15px;color:var(--ink);display:flex;align-items:center;gap:6px;}
+  .inv-row .t1 .name{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .inv-row .t2{font-size:12px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .inv-row .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+  .inv-row .qty{font-size:22px;font-weight:800;color:var(--accent-ink);font-variant-numeric:tabular-nums;line-height:1;}
+  .inv-row.low .qty{color:var(--coral-ink);}
+  .inv-row.expired .qty{color:var(--coral-ink);}
+  .inv-row .ctrl{display:flex;gap:5px;}
+  .qbtn{width:28px;height:28px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-soft);font-size:17px;font-weight:800;color:var(--accent-ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .qbtn:active{transform:scale(.92);}
+  .qbtn.m{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  .tag{display:inline-block;background:var(--accent-soft);color:var(--accent-ink);border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;}
+  .tag.warn{background:var(--coral-soft);color:var(--coral-ink);}
+  .tag.amber{background:var(--amber-soft);color:#8a6a13;}
+
+  .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+  .summary{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:14px;padding:11px 8px;text-align:center;}
+  .summary .n{font-size:20px;font-weight:800;color:var(--accent-ink);line-height:1.1;}
+  .summary .l{font-size:11px;color:var(--muted);margin-top:3px;font-weight:700;}
+
+  .alert{display:flex;align-items:center;gap:9px;background:rgba(216,124,95,.10);border:1px solid rgba(216,124,95,.30);color:var(--coral-ink);padding:11px 13px;border-radius:14px;font-size:13px;font-weight:700;margin-bottom:12px;}
+  .alert.amber{background:var(--amber-soft);border-color:rgba(242,208,107,.5);color:#7a5c0e;}
+  .alert .em{font-size:18px;}
+
+  /* FAB */
+  .fab{
+    position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 92px);
+    width:56px;height:56px;border-radius:50%;
+    background:linear-gradient(135deg,#6fa377,#5D8C61);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:300;
+    box-shadow:0 14px 32px rgba(93,140,97,.45), inset 0 1px 0 rgba(255,255,255,.35);
+    cursor:pointer;z-index:25;border:none;
+  }
+  .fab:active{transform:scale(.95);}
+
+  /* 表单 */
+  label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin:14px 0 7px;}
+  input,select,textarea{width:100%;border:1.5px solid var(--line-soft);border-radius:14px;padding:12px;font-size:15px;background:rgba(255,255,255,.66);color:var(--ink);font-family:inherit;outline:none;transition:.15s;}
   input:focus,select:focus,textarea:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-soft);}
   textarea{resize:none;min-height:60px;}
   .suggestions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;}
   .sug{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:16px;padding:6px 13px;font-size:13px;cursor:pointer;color:var(--accent-ink);font-weight:700;}
   .sug:active{transform:scale(.95);}
-
-  .btn{
-    display:flex;align-items:center;justify-content:center;gap:8px;
-    width:100%;border:none;border-radius:16px;padding:15px;font-size:16px;font-weight:800;
-    background:linear-gradient(135deg,#6fa377,#5D8C61);color:#fff;cursor:pointer;
-    box-shadow:0 10px 24px rgba(93,140,97,.32), inset 0 1px 0 rgba(255,255,255,.35);margin-top:18px;transition:.15s;
-  }
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;border-radius:16px;padding:15px;font-size:16px;font-weight:800;background:linear-gradient(135deg,#6fa377,#5D8C61);color:#fff;cursor:pointer;box-shadow:0 10px 24px rgba(93,140,97,.32), inset 0 1px 0 rgba(255,255,255,.35);margin-top:18px;transition:.15s;}
   .btn:active{transform:scale(.98);}
   .btn.ghost{background:var(--surface);border:1.5px solid var(--line-soft);color:var(--accent-ink);box-shadow:var(--shadow-xs);}
   .btn.sm{font-size:14px;padding:11px;margin-top:0;}
 
-  .filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
-  .chip{background:var(--surface);border:1.5px solid var(--line-soft);border-radius:16px;padding:6px 13px;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
-  .chip.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(93,140,97,.28);}
-  .day-group{margin-bottom:18px;}
-  .day-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);font-weight:800;margin-bottom:9px;padding:0 4px;}
-  .rec-item{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:9px;box-shadow:var(--shadow-xs);}
-  .rec-item .ic{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;}
-  .rec-item .body{flex:1;min-width:0;}
-  .rec-item .t1{font-weight:800;font-size:15px;display:flex;align-items:center;gap:6px;color:var(--ink);}
-  .rec-item .t2{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .rec-item .del{color:var(--muted);font-size:20px;padding:6px;cursor:pointer;flex-shrink:0;}
-  .rec-item .del:active{color:var(--coral-ink);}
+  .type-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+  .type-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:var(--surface-2);border:2px solid transparent;border-radius:14px;padding:11px 3px;cursor:pointer;transition:.15s;}
+  .type-btn .em{font-size:22px;line-height:1;}
+  .type-btn .lb{font-size:11px;font-weight:700;color:var(--ink-soft);}
+  .type-btn.active{border-color:var(--accent);background:#fff;box-shadow:var(--shadow-xs);}
+  .type-btn.active .lb{color:var(--accent-ink);}
 
-  .reminder-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .reminder{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--radius-sm);padding:15px;}
-  .reminder .ttl{font-size:12px;color:var(--ink-soft);font-weight:800;display:flex;align-items:center;gap:5px;}
-  .reminder .big{font-size:21px;font-weight:800;margin:7px 0 3px;color:var(--accent-ink);}
-  .reminder .small{font-size:12px;color:var(--muted);line-height:1.4;}
-  .reminder.due{background:var(--coral-soft);border-color:rgba(216,124,95,.35);}
-  .reminder.due .big{color:var(--coral-ink);}
+  /* 事件流（历史 Tab） */
+  .day-group{margin-bottom:16px;}
+  .day-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);font-weight:800;margin-bottom:8px;padding:0 4px;}
+  .ev{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-bottom:7px;box-shadow:var(--shadow-xs);}
+  .ev .ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+  .ev .body{flex:1;min-width:0;}
+  .ev .t1{font-weight:800;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:6px;}
+  .ev .t2{font-size:12px;color:var(--muted);margin-top:2px;}
+  .ev .delta{font-weight:800;font-size:15px;color:var(--accent-ink);font-variant-numeric:tabular-nums;}
+  .ev .delta.out{color:var(--coral-ink);}
+  .ev .delta.in{color:var(--accent);}
+  .ev .del{color:var(--muted);font-size:18px;padding:4px 8px;cursor:pointer;}
+
+  /* 护理打卡 */
+  .care-row{display:flex;align-items:center;gap:11px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:14px;padding:12px 13px;margin-bottom:9px;}
+  .care-row .ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+  .care-row .body{flex:1;}
+  .care-row .t1{font-weight:800;font-size:14px;}
+  .care-row .t2{font-size:12px;color:var(--muted);margin-top:2px;}
+  .care-row .go{background:var(--accent);color:#fff;border:none;border-radius:11px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;}
+  .care-row .go:active{transform:scale(.95);}
+
   .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
-  .bar-row .nm{width:66px;font-size:13px;font-weight:700;color:var(--ink-soft);flex-shrink:0;}
+  .bar-row .nm{width:90px;font-size:13px;font-weight:700;color:var(--ink-soft);flex-shrink:0;}
   .bar-track{flex:1;height:15px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;}
   .bar-fill{height:100%;background:linear-gradient(90deg,#A3B18A,#5D8C61);border-radius:9px;transition:.4s;}
   .bar-row .ct{width:34px;text-align:right;font-size:13px;font-weight:800;color:var(--accent-ink);}
 
-  .list-row{display:flex;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid var(--line-soft);}
+  /* 列表行（设置等） */
+  .list-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line-soft);}
   .list-row:last-child{border-bottom:none;}
   .list-row .ic{font-size:20px;width:34px;text-align:center;}
   .list-row .lb{flex:1;font-weight:700;color:var(--ink);}
   .list-row .val{color:var(--muted);font-size:13px;}
   .list-row .arrow{color:var(--muted);font-size:18px;}
   .list-row input{width:90px;text-align:center;padding:9px;font-weight:700;color:var(--accent-ink);}
+
   .cat-manage{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .cat-chip{display:flex;align-items:center;gap:7px;background:var(--surface-2);border:1.5px solid var(--line-soft);border-radius:20px;padding:7px 13px;font-weight:700;cursor:pointer;color:var(--ink-soft);}
   .cat-chip .x{color:var(--muted);font-size:16px;}
   .cat-chip.active{border-color:var(--accent);color:var(--accent-ink);background:#fff;box-shadow:var(--shadow-xs);}
-  .empty{text-align:center;color:var(--muted);padding:32px 14px;font-size:14px;border:1.5px dashed var(--line-soft);border-radius:var(--radius-sm);margin-top:4px;}
-  .empty .em{font-size:40px;display:block;margin-bottom:8px;}
 
-  .tabbar{
-    position:fixed;bottom:0;left:50%;transform:translateX(-50%);
-    width:100%;max-width:480px;z-index:30;
-    display:flex;background:rgba(255,253,247,.92);border-top:1px solid var(--line-soft);
-    padding-bottom:env(safe-area-inset-bottom);
-    box-shadow:0 -4px 20px rgba(58,64,52,.08);
-    backdrop-filter:blur(14px) saturate(150%);
-    -webkit-backdrop-filter:blur(14px) saturate(150%);
-  }
+  .empty{text-align:center;color:var(--muted);padding:30px 14px;font-size:14px;border:1.5px dashed var(--line-soft);border-radius:var(--radius-sm);margin-top:4px;}
+  .empty .em{font-size:36px;display:block;margin-bottom:6px;}
+
+  .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:30;display:flex;background:rgba(255,253,247,.92);border-top:1px solid var(--line-soft);padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(58,64,52,.08);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);}
   .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0;cursor:pointer;color:var(--muted);font-size:11px;font-weight:700;}
   .tab .em{font-size:21px;}
   .tab.active{color:var(--accent);}
@@ -170,65 +188,61 @@
   .mask.show{display:flex;}
   .sheet{background:var(--paper);width:100%;max-width:480px;border-radius:var(--radius) var(--radius) 0 0;padding:24px 20px calc(env(safe-area-inset-bottom) + 24px);max-height:88vh;overflow:auto;animation:up .25s ease;box-shadow:var(--shadow-md);}
   @keyframes up{from{transform:translateY(100%);}to{transform:translateY(0);}}
-  .sheet h3{margin:0 0 16px;font-size:18px;font-weight:800;color:var(--accent-ink);}
-  .close-x{position:absolute;top:18px;right:20px;font-size:26px;color:var(--muted);}
+  .sheet h3{margin:0 0 14px;font-size:18px;font-weight:800;color:var(--accent-ink);}
+  .close-x{position:absolute;top:18px;right:20px;font-size:26px;color:var(--muted);cursor:pointer;}
   .toast{position:fixed;left:50%;top:30%;transform:translateX(-50%);background:rgba(58,64,52,.94);color:#fff;padding:12px 22px;border-radius:14px;font-size:14px;font-weight:700;z-index:99;opacity:0;transition:.25s;pointer-events:none;}
   .toast.show{opacity:1;}
   .seg{display:flex;background:var(--surface-2);border-radius:12px;padding:4px;gap:4px;}
   .seg button{flex:1;border:none;background:transparent;padding:9px;border-radius:9px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer;}
   .seg button.on{background:#fff;color:var(--accent-ink);box-shadow:var(--shadow-xs);}
   .hidden{display:none!important;}
+
+  /* 库存分类颜色块 */
+  .swatch{width:14px;height:14px;border-radius:4px;display:inline-block;}
 </style>
 </head>
 <body>
 
 <div class="appbar">
   <h1>🐱 猫猫日常</h1>
-  <div class="sub">记录每一口饭、每一次护理</div>
+  <div class="sub">家里的口粮、零食、驱虫药…清清楚楚</div>
   <div class="cat-pill" id="catPill"><span class="dot"></span><span id="catPillName">默认猫咪</span> ▾</div>
 </div>
 
-<!-- ===== 记录 ===== -->
-<div class="content" id="tab-record">
+<!-- ===== 库存 ===== -->
+<div class="content" id="tab-stock">
+  <div id="alerts"></div>
+
   <div class="card">
-    <h2><span class="em">📝</span> 添加一条记录</h2>
-    <div class="type-grid" id="typeGrid"></div>
-
-    <label>名称 / 品牌</label>
-    <input id="recName" placeholder="如：渴望鸡、巅峰罐、化毛膏…" />
-    <div class="suggestions" id="sugBox"></div>
-
-    <label>数量 / 用量</label>
-    <input id="recAmount" placeholder="如：50g、1罐、半根、1粒…" />
-
-    <label>备注</label>
-    <textarea id="recNote" placeholder="可选：观察、感受、特殊情况…"></textarea>
-
-    <label>时间</label>
-    <input id="recTime" type="datetime-local" />
-
-    <button class="btn" id="saveBtn">✅ 保存记录</button>
+    <h2><span class="em">📦</span> 当前库存</h2>
+    <div class="filter-row" id="stockFilter"></div>
+    <div id="stockList"></div>
+    <button class="btn" id="addStockBtn" style="margin-top:14px;">＋ 添加库存</button>
   </div>
 </div>
 
-<!-- ===== 历史 ===== -->
-<div class="content hidden" id="tab-history">
+<!-- ===== 流水 ===== -->
+<div class="content hidden" id="tab-flow">
   <div class="card">
-    <h2><span class="em">📜</span> 历史记录</h2>
-    <div class="filter-row" id="filterRow"></div>
-    <div id="historyList"></div>
+    <h2><span class="em">📜</span> 流水</h2>
+    <div class="filter-row" id="flowFilter"></div>
+    <div id="flowList"></div>
   </div>
 </div>
 
 <!-- ===== 统计 ===== -->
 <div class="content hidden" id="tab-stats">
   <div class="card">
-    <h2><span class="em">🔔</span> 护理提醒</h2>
-    <div class="reminder-grid" id="reminderGrid"></div>
+    <h2><span class="em">🔔</span> 库存预警</h2>
+    <div id="stockAlertList"></div>
   </div>
   <div class="card">
-    <h2><span class="em">📊</span> 近 30 天记录分布</h2>
-    <div id="barChart"></div>
+    <h2><span class="em">🐾</span> 护理打卡</h2>
+    <div id="careList"></div>
+  </div>
+  <div class="card">
+    <h2><span class="em">📊</span> 库存分类汇总</h2>
+    <div id="catSummary"></div>
   </div>
 </div>
 
@@ -259,16 +273,60 @@
 
 <!-- bottom nav -->
 <div class="tabbar">
-  <div class="tab active" data-tab="record"><div class="em">📝</div>记录</div>
-  <div class="tab" data-tab="history"><div class="em">📜</div>历史</div>
+  <div class="tab active" data-tab="stock"><div class="em">📦</div>库存</div>
+  <div class="tab" data-tab="flow"><div class="em">📜</div>流水</div>
   <div class="tab" data-tab="stats"><div class="em">📊</div>统计</div>
   <div class="tab" data-tab="me"><div class="em">🐈</div>我的</div>
 </div>
 
-<!-- sheets / modals -->
+<!-- 库存新增/编辑 -->
+<div class="mask" id="invMask">
+  <div class="sheet" style="position:relative;">
+    <span class="close-x" data-close-inv>×</span>
+    <h3 id="invSheetTitle">添加库存</h3>
+
+    <label>分类</label>
+    <div class="type-grid" id="invTypeGrid"></div>
+
+    <label>名称 <span style="font-weight:500;color:var(--muted);">（如：渴望鸡、巅峰罐、福来恩…）</span></label>
+    <input id="invName" placeholder="品牌 / 产品名" />
+    <div class="suggestions" id="invSug"></div>
+
+    <label>品牌 / 规格（可选）</label>
+    <input id="invBrand" placeholder="如：渴望 / 1.5kg" />
+    <input id="invSpec" placeholder="如：5kg/袋、6 罐/盒…" style="margin-top:8px;" />
+
+    <label>数量</label>
+    <input id="invQty" type="number" min="0" step="1" placeholder="本 SKU 当前总数量" />
+
+    <div class="seg" style="margin-top:10px;">
+      <button id="qtyModeNow" class="on">作为当前总量</button>
+      <button id="qtyModeAdd">作为新增入库</button>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;">
+        <label>低库存提醒（低于多少提醒）</label>
+        <input id="invThreshold" type="number" min="0" step="1" placeholder="如：2" />
+      </div>
+      <div style="flex:1;">
+        <label>过期日期（可选）</label>
+        <input id="invExpiry" type="date" />
+      </div>
+    </div>
+
+    <label>备注（可选）</label>
+    <textarea id="invNote" placeholder="如：进口、换粮过渡中…"></textarea>
+
+    <button class="btn" id="invSaveBtn">✅ 保存</button>
+    <button class="btn ghost sm" id="invDelBtn" style="display:none;margin-top:8px;">🗑 删除此库存</button>
+  </div>
+</div>
+
+<!-- 猫咪 -->
 <div class="mask" id="catMask">
   <div class="sheet" style="position:relative;">
-    <span class="close-x" data-close>×</span>
+    <span class="close-x" data-close-cat>×</span>
     <h3 id="catSheetTitle">添加猫咪</h3>
     <label>名字</label>
     <input id="catNameInput" placeholder="如：布丁、年糕…" />
@@ -278,50 +336,153 @@
   </div>
 </div>
 
-<input type="file" id="importFile" accept="application/json" class="hidden" />
+<!-- 长按 / 单条事件编辑 -->
+<div class="mask" id="evMask">
+  <div class="sheet" style="position:relative;">
+    <span class="close-x" data-close-ev>×</span>
+    <h3 id="evSheetTitle">编辑这条</h3>
+    <label>时间</label>
+    <input id="evTime" type="datetime-local" />
+    <label>备注</label>
+    <textarea id="evNote" placeholder="（可选）"></textarea>
+    <button class="btn" id="evSaveBtn">保存</button>
+    <button class="btn ghost sm" id="evDelBtn" style="margin-top:8px;">🗑 删除</button>
+  </div>
+</div>
 
+<input type="file" id="importFile" accept="application/json" class="hidden" />
 <div class="toast" id="toast"></div>
 
 <script>
 "use strict";
-/* ---------- 类型定义（配色取自参考站点的治愈书卷风调色板） ---------- */
-const TYPES = {
+
+/* ---------- 分类定义 ---------- */
+// 库存分类（只放消耗品，不含洗澡驱虫）
+const INV = {
   kibble:    {label:"猫粮",   em:"🌾", color:"#8B6B4E"},
   can:       {label:"猫罐头", em:"🥫", color:"#5D8C61"},
   stick:     {label:"猫条",   em:"🍥", color:"#E6C987"},
   snack:     {label:"零食",   em:"🦴", color:"#D87C5F"},
   food:      {label:"食物",   em:"🍗", color:"#A3B18A"},
   supplement:{label:"营养品", em:"💊", color:"#6A9E6E"},
-  bath:      {label:"洗澡",   em:"🛁", color:"#3f8ba6"},
-  dewi:      {label:"体内驱虫",em:"🪱", color:"#9A4D38"},
-  dewe:      {label:"体外驱虫",em:"🪰", color:"#C08552"},
+  medicine:  {label:"驱虫/药品",em:"🪱", color:"#9A4D38"},
+  litter:    {label:"猫砂",   em:"🧹", color:"#C08552"},
   other:     {label:"其他",   em:"✨", color:"#8A9A7D"},
 };
-const TYPES_ORDER = ["kibble","can","stick","snack","food","supplement","bath","dewi","dewe","other"];
+const INV_ORDER = ["kibble","can","stick","snack","food","supplement","medicine","litter","other"];
+
+// 护理分类
+const CARE = {
+  bath:  {label:"洗澡",   em:"🛁", color:"#3f8ba6"},
+  dewi:  {label:"体内驱虫",em:"💊", color:"#9A4D38"},
+  dewe:  {label:"体外驱虫",em:"🪰", color:"#C08552"},
+  nail:  {label:"剪指甲", em:"✂️", color:"#A3B18A"},
+  tooth: {label:"刷牙",   em:"🪥", color:"#6A9E6E"},
+  other: {label:"其他",   em:"✨", color:"#8A9A7D"},
+};
+const CARE_ORDER = ["bath","dewi","dewe","nail","tooth","other"];
+
 const COLORS = ["#5D8C61","#D87C5F","#3f8ba6","#9A4D38","#A3B18A","#E6C987","#C08552"];
 
-/* ---------- 存储 ---------- */
-const KEY = "catdaily_v1";
+/* ---------- 数据模型 ----------
+{
+  cats:        [{id,name,color}],
+  activeCat:   'c1',
+  settings:    {bath, dewi, dewe},   // 护理周期（天）
+  library:     {[invCat]: [name, ...]},  // 常用名联想词
+  inventory:   [{
+    id, catId,
+    cat,        // INV 分类
+    name, brand, spec,
+    qty,        // 当前库存数量
+    threshold,  // 低于此提醒
+    expiry,     // 'YYYY-MM-DD'
+    note,
+    updatedAt,
+    logs:       [{id, ts, delta, note}]   // 变动流水
+  }],
+  careLogs:    [{id, catId, type, ts, note}],  // type 来自 CARE
+}
+*/
+const KEY = "catdaily_v2";
 let DB = load();
 function load(){
   try{
     const r = JSON.parse(localStorage.getItem(KEY));
-    if(r && r.records) return r;
+    if(r && r.inventory){ migrateFromV1(); }
+    if(r) return r;
   }catch(e){}
+  return defaultDB();
+}
+function defaultDB(){
   return {
     cats:[{id:"c1",name:"默认猫咪",color:"#5D8C61"}],
     activeCat:"c1",
     settings:{bath:30,dewi:90,dewe:30},
     library:{},
-    records:[]
+    inventory:[],
+    careLogs:[],
   };
 }
 function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
+
+/* ---------- V1 → V2 迁移 ----------
+  老数据格式：{records:[{id,catId,type,name,amount,note,ts}], library, settings, cats}
+  - 洗澡/驱虫 → careLogs
+  - 食物类 → 合并为 inventory（同名同 spec 视为同一 SKU）
+  - 用户再开启就拿不到 v1 数据了，这次顺手把 v1 数据也清掉
+*/
+function migrateFromV1(){
+  try{
+    const old = JSON.parse(localStorage.getItem("catdaily_v1"));
+    if(!old) return;
+    const inv = old.records || [];
+    const map = {};   // catId|cat|name|spec → item
+    inv.forEach(r=>{
+      const k = ["bath","dewi","dewe"].includes(r.type);
+      if(k){
+        DB.careLogs = DB.careLogs || [];
+        DB.careLogs.push({id:"cl"+r.id.slice(1), catId:r.catId, type:r.type, ts:r.ts, note:r.note||""});
+        return;
+      }
+      const spec = (r.amount||"").trim() || "1 件";
+      const key = [r.catId, r.type, r.name, spec].join("|");
+      if(!map[key]){
+        map[key] = {
+          id:"sk"+r.id.slice(1),
+          catId:r.catId,
+          cat: (r.type==="other")?"other":r.type,
+          name:r.name||"",
+          brand:"",
+          spec,
+          qty:0, threshold:0, expiry:"", note:"",
+          updatedAt:r.ts,
+          logs:[]
+        };
+        DB.inventory.push(map[key]);
+      }
+      const it = map[key];
+      it.qty += 1;
+      it.logs.push({id:"l"+r.id.slice(1), ts:r.ts, delta:1, note:r.note||""});
+      if(r.ts>it.updatedAt) it.updatedAt=r.ts;
+    });
+    if(old.library) DB.library = old.library;
+    if(old.settings) DB.settings = {...DB.settings, ...old.settings};
+    if(old.cats && old.cats.length){ DB.cats = old.cats; DB.activeCat = old.activeCat||old.cats[0].id; }
+    save();
+    try{ localStorage.removeItem("catdaily_v1"); }catch(e){}
+  }catch(e){ console.warn("v1 migration skipped",e); }
+}
 
 /* ---------- 工具 ---------- */
 function toast(msg){
   const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
   clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1600);
+}
+function uid(p){ return p+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function nowLocalInput(){
+  const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
 }
 function fmtTime(ts){
   const d=new Date(ts), n=new Date();
@@ -337,142 +498,415 @@ function fmtDate(ts){ const d=new Date(ts); return (d.getMonth()+1)+"月"+d.getD
 function dayKey(ts){ const d=new Date(ts); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
 function daysBetween(a,b){ return Math.floor((b-a)/86400000); }
 function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
-
-/* ---------- 选中类型 ---------- */
-let selType = "kibble";
-function renderTypeGrid(){
-  const g=document.getElementById("typeGrid"); g.innerHTML="";
-  TYPES_ORDER.forEach(k=>{
-    const b=document.createElement("div");
-    b.className="type-btn"+(k===selType?" active":"");
-    b.innerHTML=`<div class="em">${TYPES[k].em}</div><div class="lb">${TYPES[k].label}</div>`;
-    b.onclick=()=>{ selType=k; renderTypeGrid(); renderSuggestions(); };
-    g.appendChild(b);
-  });
-}
-function renderSuggestions(){
-  const box=document.getElementById("sugBox"); box.innerHTML="";
-  const list=DB.library[selType]||[];
-  list.slice(0,8).forEach(n=>{
-    const s=document.createElement("div"); s.className="sug"; s.textContent=n;
-    s.onclick=()=>{ document.getElementById("recName").value=n; };
-    box.appendChild(s);
-  });
+function daysToExpiry(dateStr){
+  if(!dateStr) return null;
+  const d = new Date(dateStr+"T00:00:00");
+  return Math.floor((d - new Date())/86400000);
 }
 
-/* ---------- 保存记录 ---------- */
-function nowLocalInput(){
-  const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
-  return d.toISOString().slice(0,16);
+/* ---------- 库存聚合 ---------- */
+function myInventory(){
+  return DB.inventory.filter(x=>x.catId===DB.activeCat);
 }
-function initForm(){
-  document.getElementById("recTime").value = nowLocalInput();
-}
-document.getElementById("saveBtn").onclick=()=>{
-  const name=document.getElementById("recName").value.trim();
-  const amount=document.getElementById("recAmount").value.trim();
-  const note=document.getElementById("recNote").value.trim();
-  const timeVal=document.getElementById("recTime").value;
-  if(!name && selType!=="bath"){ toast("请填写名称/品牌"); return; }
-  const ts = timeVal? new Date(timeVal).getTime() : Date.now();
-  const rec={ id:"r"+Date.now()+Math.random().toString(36).slice(2,6),
-    catId:DB.activeCat, type:selType, name:name||TYPES[selType].label,
-    amount, note, ts };
-  DB.records.push(rec);
-  if(name){ (DB.library[selType]=DB.library[selType]||[]); if(!DB.library[selType].includes(name)) DB.library[selType].unshift(name); }
-  save();
-  document.getElementById("recName").value="";
-  document.getElementById("recAmount").value="";
-  document.getElementById("recNote").value="";
-  document.getElementById("recTime").value=nowLocalInput();
-  renderSuggestions();
-  toast("已保存 ✅");
-};
 
-/* ---------- 历史 ---------- */
-let curFilter="all";
-function renderFilters(){
-  const row=document.getElementById("filterRow"); row.innerHTML="";
-  const chips=[["all","全部"]].concat(TYPES_ORDER.map(k=>[k,TYPES[k].label]));
-  chips.forEach(([k,lb])=>{
+/* ---------- 库存列表渲染 ---------- */
+let stockFilter = "all";
+function renderStockFilter(){
+  const row=document.getElementById("stockFilter"); row.innerHTML="";
+  const items = [["all","全部"]].concat(INV_ORDER.map(k=>[k,INV[k].label]));
+  items.forEach(([k,lb])=>{
     const c=document.createElement("div");
-    c.className="chip"+(k===curFilter?" active":"");
-    c.textContent=lb; c.onclick=()=>{ curFilter=k; renderFilters(); renderHistory(); };
+    c.className="chip"+(k===stockFilter?" active":"");
+    c.textContent=lb; c.onclick=()=>{ stockFilter=k; renderStockFilter(); renderStock(); };
     row.appendChild(c);
   });
 }
-function renderHistory(){
-  const list=document.getElementById("historyList");
-  let recs=DB.records.filter(r=>r.catId===DB.activeCat);
-  if(curFilter!=="all") recs=recs.filter(r=>r.type===curFilter);
-  recs.sort((a,b)=>b.ts-a.ts);
-  if(recs.length===0){ list.innerHTML='<div class="empty"><span class="em">🐾</span>还没有记录，去「记录」添加第一条吧</div>'; return; }
+function renderStock(){
+  const box=document.getElementById("stockList");
+  let list = myInventory();
+  if(stockFilter!=="all") list = list.filter(x=>x.cat===stockFilter);
+  list.sort((a,b)=> (b.updatedAt||0)-(a.updatedAt||0));
+  if(list.length===0){
+    box.innerHTML='<div class="empty"><span class="em">📭</span>还没有库存条目，点下面按钮添加第一个吧</div>';
+    return;
+  }
+  let html="";
+  list.forEach(it=>{
+    const t = INV[it.cat]||INV.other;
+    const daysExp = daysToExpiry(it.expiry);
+    const isExpired = daysExp!==null && daysExp<=0;
+    const isLow = it.threshold>0 && it.qty<=it.threshold;
+    const rowCls = "inv-row"+(isLow?" low":"")+(isExpired?" expired":"");
+    html += `<div class="${rowCls}" data-id="${it.id}">
+      <div class="ic" style="background:${t.color}22">${t.em}</div>
+      <div class="body" data-edit="${it.id}">
+        <div class="t1"><span class="name">${escapeHtml(it.name||t.label)}</span>
+          ${it.brand?`<span class="tag">${escapeHtml(it.brand)}</span>`:""}
+          ${isLow?`<span class="tag warn">⚠ 库存低</span>`:""}
+        </div>
+        <div class="t2">
+          ${it.spec?escapeHtml(it.spec):""}
+          ${it.expiry?`<span class="tag ${isExpired?'warn':'amber'}">${isExpired?'已过期':'至 '+escapeHtml(it.expiry)}${daysExp!==null&&!isExpired?'（剩'+(daysExp)+'天）':''}</span>`:""}
+        </div>
+      </div>
+      <div class="right">
+        <div class="qty">${it.qty}</div>
+        <div class="ctrl">
+          <button class="qbtn" data-dec="${it.id}">−</button>
+          <button class="qbtn m" data-inc="${it.id}">+</button>
+        </div>
+      </div>
+    </div>`;
+  });
+  box.innerHTML = html;
+
+  // 绑定 +/-/编辑
+  box.querySelectorAll("[data-inc]").forEach(b=>b.onclick=e=>{
+    e.stopPropagation(); adjustQty(b.dataset.inc, +1);
+  });
+  box.querySelectorAll("[data-dec]").forEach(b=>b.onclick=e=>{
+    e.stopPropagation(); adjustQty(b.dataset.dec, -1);
+  });
+  box.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openInvSheet(b.dataset.edit));
+}
+
+function adjustQty(id, delta){
+  const it = DB.inventory.find(x=>x.id===id);
+  if(!it) return;
+  const before = it.qty;
+  it.qty = Math.max(0, it.qty + delta);
+  if(it.qty===before) return;
+  it.updatedAt = Date.now();
+  it.logs.push({id:uid("l"), ts:Date.now(), delta, note:""});
+  save();
+  renderStock(); renderStats(); renderFlow();
+}
+
+/* ---------- 库存表单 ---------- */
+let editInvId=null;
+let invFormCat="kibble";
+let invFormMode="now";  // now=覆盖当前总量 / add=加到现有数量
+function renderInvTypeGrid(){
+  const g=document.getElementById("invTypeGrid"); g.innerHTML="";
+  INV_ORDER.forEach(k=>{
+    const b=document.createElement("div");
+    b.className="type-btn"+(k===invFormCat?" active":"");
+    b.innerHTML=`<div class="em">${INV[k].em}</div><div class="lb">${INV[k].label}</div>`;
+    b.onclick=()=>{ invFormCat=k; renderInvTypeGrid(); renderInvSug(); };
+    g.appendChild(b);
+  });
+}
+function renderInvSug(){
+  const box=document.getElementById("invSug"); box.innerHTML="";
+  (DB.library[invFormCat]||[]).slice(0,8).forEach(n=>{
+    const s=document.createElement("div"); s.className="sug"; s.textContent=n;
+    s.onclick=()=>{ document.getElementById("invName").value=n; };
+    box.appendChild(s);
+  });
+}
+function openInvSheet(id){
+  editInvId = id;
+  const isEdit = !!id;
+  document.getElementById("invSheetTitle").textContent = isEdit?"编辑库存":"添加库存";
+  document.getElementById("invDelBtn").style.display = isEdit?"":"none";
+  document.getElementById("invQtyModeWrap") && (document.getElementById("invQtyModeWrap").style.display = isEdit?"none":"block");
+
+  // 数量模式切换：编辑时强制 "now"，新增时允许选 add
+  invFormMode = "now";
+  setModeBtn();
+
+  if(isEdit){
+    const it = DB.inventory.find(x=>x.id===id);
+    invFormCat = it.cat;
+    document.getElementById("invName").value = it.name||"";
+    document.getElementById("invBrand").value = it.brand||"";
+    document.getElementById("invSpec").value = it.spec||"";
+    document.getElementById("invQty").value = it.qty;
+    document.getElementById("invThreshold").value = it.threshold||"";
+    document.getElementById("invExpiry").value = it.expiry||"";
+    document.getElementById("invNote").value = it.note||"";
+  }else{
+    invFormCat = "kibble";
+    ["invName","invBrand","invSpec","invQty","invThreshold","invExpiry","invNote"].forEach(i=>document.getElementById(i).value="");
+  }
+  renderInvTypeGrid(); renderInvSug();
+  document.getElementById("invMask").classList.add("show");
+  setTimeout(()=>document.getElementById("invName").focus(),80);
+}
+function setModeButtonUI_(){
+  const on = invFormMode==="now";
+  document.getElementById("qtyModeNow").classList.toggle("on",on);
+  document.getElementById("qtyModeAdd").classList.toggle("on",!on);
+  const qtyInput = document.getElementById("invQty");
+  qtyInput.placeholder = on ? "本 SKU 当前总数量" : "本次新进多少";
+}
+function setModeBtn(){ setModeButtonUI_(); }
+document.getElementById("qtyModeNow").onclick=()=>{ invFormMode="now"; setModeBtn(); };
+document.getElementById("qtyModeAdd").onclick=()=>{ invFormMode="add"; setModeBtn(); };
+function closeInvSheet(){ document.getElementById("invMask").classList.remove("show"); editInvId=null; }
+document.querySelectorAll("[data-close-inv]").forEach(x=>x.onclick=closeInvSheet);
+document.getElementById("invMask").onclick=e=>{ if(e.target.id==="invMask") closeInvSheet(); };
+
+document.getElementById("invSaveBtn").onclick=()=>{
+  const name = document.getElementById("invName").value.trim();
+  if(!name && invFormCat!=="other"){ toast("请填写名称"); return; }
+  const brand = document.getElementById("invBrand").value.trim();
+  const spec = document.getElementById("invSpec").value.trim() || "1 件";
+  const qtyInput = document.getElementById("invQty").value;
+  const qty = Math.max(0, +qtyInput || 0);
+  const threshold = Math.max(0, +document.getElementById("invThreshold").value || 0);
+  const expiry = document.getElementById("invExpiry").value || "";
+  const note = document.getElementById("invNote").value.trim();
+
+  if(editInvId){
+    const it = DB.inventory.find(x=>x.id===editInvId);
+    const before = it.qty;
+    it.cat = invFormCat;
+    it.name = name;
+    it.brand = brand;
+    it.spec = spec;
+    it.qty = qty;
+    it.threshold = threshold;
+    it.expiry = expiry;
+    it.note = note;
+    it.updatedAt = Date.now();
+    if(qty !== before){
+      it.logs.push({id:uid("l"), ts:Date.now(), delta:qty-before, note:"调整"});
+    }
+    toast("已保存 ✏️");
+  }else{
+    let it = DB.inventory.find(x=>x.catId===DB.activeCat && x.cat===invFormCat && x.name===name && x.spec===spec);
+    if(!it){
+      it = {
+        id:uid("sk"), catId:DB.activeCat, cat:invFormCat,
+        name, brand, spec, qty:0, threshold, expiry, note,
+        updatedAt:Date.now(), logs:[]
+      };
+      DB.inventory.push(it);
+    }
+    if(invFormMode==="add"){
+      it.qty += qty;
+      it.logs.push({id:uid("l"), ts:Date.now(), delta:+qty||0, note:"入库"+(note?" · "+note:"")});
+    }else{
+      it.qty = qty;
+      if(it.threshold===0 && threshold>0) it.threshold = threshold;
+      it.logs.push({id:uid("l"), ts:Date.now(), delta:qty, note:"录入"+(note?" · "+note:"")});
+    }
+    if(expiry) it.expiry = expiry;
+    if(brand && !it.brand) it.brand = brand;
+    it.updatedAt = Date.now();
+    toast("已添加 ✅");
+  }
+  if(name){
+    DB.library[invFormCat] = DB.library[invFormCat]||[];
+    if(!DB.library[invFormCat].includes(name)) DB.library[invFormCat].unshift(name);
+  }
+  save();
+  closeInvSheet();
+  renderStock(); renderStats(); renderFlow();
+};
+document.getElementById("invDelBtn").onclick=()=>{
+  if(!editInvId) return;
+  if(!confirm("删除该库存条目？历史流水也会被一并删除。")) return;
+  DB.inventory = DB.inventory.filter(x=>x.id!==editInvId);
+  save();
+  closeInvSheet();
+  renderStock(); renderStats(); renderFlow();
+  toast("已删除");
+};
+
+/* 主页面 "+" 按钮 */
+document.getElementById("addStockBtn").onclick=()=>openInvSheet(null);
+
+/* ---------- 流水 ---------- */
+let flowFilter="all";
+function renderFlowFilter(){
+  const row=document.getElementById("flowFilter"); row.innerHTML="";
+  const items = [["all","全部"],["inv","库存变动"],["care","护理打卡"]];
+  items.forEach(([k,lb])=>{
+    const c=document.createElement("div");
+    c.className="chip"+(k===flowFilter?" active":"");
+    c.textContent=lb; c.onclick=()=>{ flowFilter=k; renderFlowFilter(); renderFlow(); };
+    row.appendChild(c);
+  });
+}
+function renderFlow(){
+  const box=document.getElementById("flowList"); box.innerHTML="";
+
+  // 库存流水：聚合每个 SKU 的 logs
+  const invEvents = [];
+  myInventory().forEach(it=>{
+    const t = INV[it.cat]||INV.other;
+    (it.logs||[]).forEach(l=>{
+      invEvents.push({...l, _kind:"inv", _cat:it.cat, _t:t, _name:it.name, _spec:it.spec, _itemId:it.id});
+    });
+  });
+  // 护理流水
+  const careEvents = DB.careLogs.filter(c=>c.catId===DB.activeCat)
+    .map(c=>({...c, _kind:"care", _t:CARE[c.type]||CARE.other}));
+
+  let all = invEvents.concat(careEvents).filter(e=>{
+    if(flowFilter==="inv") return e._kind==="inv";
+    if(flowFilter==="care") return e._kind==="care";
+    return true;
+  });
+  all.sort((a,b)=>b.ts-a.ts);
+  if(all.length===0){
+    box.innerHTML='<div class="empty"><span class="em">📜</span>还没有流水记录</div>';
+    return;
+  }
   const groups={};
-  recs.forEach(r=>{ const k=dayKey(r.ts); (groups[k]=groups[k]||[]).push(r); });
+  all.forEach(e=>{ const k=dayKey(e.ts); (groups[k]=groups[k]||[]).push(e); });
   let html="";
   Object.keys(groups).sort((a,b)=>new Date(b)-new Date(a)).forEach(k=>{
     const arr=groups[k].sort((a,b)=>b.ts-a.ts);
-    const first=arr[0];
-    html+=`<div class="day-group"><div class="day-head"><span>${fmtDate(first.ts)}</span><span>${arr.length} 条</span></div>`;
-    arr.forEach(r=>{
-      const t=TYPES[r.type]||TYPES.other;
-      html+=`<div class="rec-item">
-        <div class="ic" style="background:${t.color}22">${t.em}</div>
-        <div class="body">
-          <div class="t1">${t.label} · ${escapeHtml(r.name)}</div>
-          <div class="t2">${r.amount?("📦 "+escapeHtml(r.amount)+"　"):""}${r.note?escapeHtml(r.note):fmtTime(r.ts)}</div>
-        </div>
-        <div class="del" data-id="${r.id}">🗑</div>
-      </div>`;
+    html += `<div class="day-group"><div class="day-head"><span>${fmtDate(arr[0].ts)}</span><span>${arr.length} 条</span></div>`;
+    arr.forEach(e=>{
+      if(e._kind==="inv"){
+        const t=e._t;
+        const isAdd = e.delta>=0;
+        const sign = isAdd?"+":"";
+        html += `<div class="ev">
+          <div class="ic" style="background:${t.color}22">${t.em}</div>
+          <div class="body">
+            <div class="t1">${escapeHtml(e._name||t.label)}
+              <span class="tag">${escapeHtml(t.label)}</span>
+              ${e._spec?`<span class="tag">${escapeHtml(e._spec)}</span>`:""}
+            </div>
+            <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
+          </div>
+          <div class="delta ${isAdd?'in':'out'}">${sign}${e.delta}</div>
+        </div>`;
+      } else {
+        const t=e._t;
+        html += `<div class="ev">
+          <div class="ic" style="background:${t.color}22">${t.em}</div>
+          <div class="body">
+            <div class="t1">${t.label} <span class="tag">${t.em}</span></div>
+            <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
+          </div>
+        </div>`;
+      }
     });
-    html+="</div>";
+    html += "</div>";
   });
-  list.innerHTML=html;
-  list.querySelectorAll(".del").forEach(b=>b.onclick=()=>{
-    const id=b.dataset.id;
-    DB.records=DB.records.filter(r=>r.id!==id); save(); renderHistory(); renderStats();
-  });
+  box.innerHTML = html;
 }
 
 /* ---------- 统计 ---------- */
-function lastByType(types){
-  const arr=DB.records.filter(r=>r.catId===DB.activeCat && types.includes(r.type)).sort((a,b)=>b.ts-a.ts);
-  return arr[0];
+function lastCare(type){
+  return DB.careLogs.filter(c=>c.catId===DB.activeCat && c.type===type).sort((a,b)=>b.ts-a.ts)[0];
 }
 function renderStats(){
-  const grid=document.getElementById("reminderGrid"); grid.innerHTML="";
-  const now=Date.now();
-  const items=[
-    {key:"bath", ttl:"🛁 洗澡", type:["bath"], interval:DB.settings.bath},
-    {key:"dewi", ttl:"💊 体内驱虫", type:["dewi"], interval:DB.settings.dewi},
-    {key:"dewe", ttl:"🪰 体外驱虫", type:["dewe"], interval:DB.settings.dewe},
+  // 1. 低库存预警
+  const sb = document.getElementById("stockAlertList");
+  const low = myInventory().filter(x=> x.threshold>0 && x.qty<=x.threshold);
+  const exp = myInventory().filter(x=> x.expiry && (daysToExpiry(x.expiry)<=7));
+  let shtml="";
+  if(low.length===0 && exp.length===0){
+    shtml = '<div class="empty"><span class="em">🌿</span>一切正常，没有预警</div>';
+  } else {
+    low.forEach(it=>{
+      const t=INV[it.cat]||INV.other;
+      shtml += `<div class="ev" style="border-color:rgba(216,124,95,.45);background:rgba(216,124,95,.05);">
+        <div class="ic" style="background:${t.color}22">${t.em}</div>
+        <div class="body">
+          <div class="t1">${escapeHtml(it.name)} <span class="tag warn">库存仅 ${it.qty} / 阈值 ${it.threshold}</span></div>
+          <div class="t2">${escapeHtml(t.label)} · ${escapeHtml(it.spec||"")}</div>
+        </div>
+      </div>`;
+    });
+    exp.forEach(it=>{
+      const t=INV[it.cat]||INV.other;
+      const d = daysToExpiry(it.expiry);
+      const lbl = d<=0?`已过期 ${-d} 天`:d<=7?`临期 ${d} 天`:null;
+      if(!lbl) return;
+      shtml += `<div class="ev" style="border-color:rgba(242,208,107,.6);background:rgba(242,208,107,.08);">
+        <div class="ic" style="background:${t.color}22">${t.em}</div>
+        <div class="body">
+          <div class="t1">${escapeHtml(it.name)} <span class="tag amber">${lbl}</span></div>
+          <div class="t2">${escapeHtml(t.label)} · 至 ${escapeHtml(it.expiry)}</div>
+        </div>
+      </div>`;
+    });
+  }
+  sb.innerHTML = shtml;
+
+  // 2. 护理打卡
+  const cb = document.getElementById("careList");
+  const now = Date.now();
+  const careItems = [
+    {key:"bath", ttl:"🛁 洗澡", interval:DB.settings.bath, color:CARE.bath.color, em:CARE.bath.em},
+    {key:"dewi", ttl:"💊 体内驱虫", interval:DB.settings.dewi, color:CARE.dewi.color, em:CARE.dewi.em},
+    {key:"dewe", ttl:"🪰 体外驱虫", interval:DB.settings.dewe, color:CARE.dewe.color, em:CARE.dewe.em},
   ];
-  items.forEach(it=>{
-    const last=lastByType(it.type);
-    let big,small,due=false;
+  let ch="";
+  careItems.forEach(it=>{
+    const last = lastCare(it.key);
+    let next="", due=false;
     if(last){
       const diff=daysBetween(last.ts,now);
-      const next=last.ts+it.interval*86400000;
-      const left=Math.ceil(daysBetween(now,next));
-      big=diff+" 天前";
-      if(left<=0){ small="⚠️ 已到周期，建议安排"; due=true; }
-      else { small="下次约 "+fmtDate(next)+"（还剩 "+left+" 天）"; }
-    }else{ big="未记录"; small="设置周期后自动提醒"; }
-    grid.innerHTML+=`<div class="reminder ${due?'due':''}">
-      <div class="ttl">${it.ttl}</div><div class="big">${big}</div><div class="small">${small}</div></div>`;
+      const nextTs=last.ts+it.interval*86400000;
+      const left=Math.ceil(daysBetween(now,nextTs));
+      next = left<=0?`⚠️ 已到周期`:`距上次 ${diff} 天 · 下次 ${fmtDate(nextTs)}`;
+      if(left<=0) due=true;
+    }else{
+      next = "尚未打卡";
+    }
+    ch += `<div class="care-row">
+      <div class="ic" style="background:${it.color}22">${it.em}</div>
+      <div class="body">
+        <div class="t1">${it.ttl}</div>
+        <div class="t2" style="color:${due?'var(--coral-ink)':'var(--muted)'};">${next}</div>
+      </div>
+      <button class="go" data-care="${it.key}">立即打卡</button>
+    </div>`;
+  });
+  cb.innerHTML = ch;
+  cb.querySelectorAll("[data-care]").forEach(b=>b.onclick=()=>{
+    const key = b.dataset.care;
+    DB.careLogs.push({id:uid("cl"), catId:DB.activeCat, type:key, ts:Date.now(), note:""});
+    save();
+    renderStats(); renderFlow();
+    toast("已打卡 ✅");
   });
 
-  const bar=document.getElementById("barChart"); bar.innerHTML="";
-  const counts={}; let max=0;
-  DB.records.filter(r=>r.catId===DB.activeCat && r.ts>now-30*86400000).forEach(r=>{ counts[r.type]=(counts[r.type]||0)+1; max=Math.max(max,counts[r.type]); });
-  TYPES_ORDER.forEach(k=>{
-    const c=counts[k]||0;
-    const t=TYPES[k];
-    bar.innerHTML+=`<div class="bar-row">
+  // 3. 分类汇总
+  const cbox = document.getElementById("catSummary");
+  const totals={}; let max=0;
+  myInventory().forEach(it=>{
+    totals[it.cat] = (totals[it.cat]||0) + it.qty;
+    max = Math.max(max, totals[it.cat]);
+  });
+  let sum="";
+  INV_ORDER.forEach(k=>{
+    const t=INV[k];
+    const c=totals[k]||0;
+    sum += `<div class="bar-row">
       <div class="nm">${t.em}${t.label}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${max?c/max*100:0}%"></div></div>
-      <div class="ct">${c}</div></div>`;
+      <div class="ct">${c}</div>
+    </div>`;
   });
+  cbox.innerHTML = sum;
+}
+
+/* ---------- 顶部 alert（库存 Tab 顶） ---------- */
+function renderAlerts(){
+  const box=document.getElementById("alerts");
+  const low = myInventory().filter(x=> x.threshold>0 && x.qty<=x.threshold);
+  const exp = myInventory().filter(x=> x.expiry && (daysToExpiry(x.expiry)<=7));
+  let html="";
+  if(low.length){
+    html += `<div class="alert"><span class="em">⚠️</span>有 ${low.length} 项库存低于阈值，点击顶部「统计」查看详情</div>`;
+  }
+  exp.forEach(it=>{
+    const d = daysToExpiry(it.expiry);
+    if(d<=0){
+      html += `<div class="alert"><span class="em">📅</span>${escapeHtml(it.name)} 已过期 ${-d} 天</div>`;
+    }
+  });
+  box.innerHTML = html;
 }
 
 /* ---------- 猫咪 ---------- */
@@ -486,8 +920,8 @@ function renderCatManage(){
   DB.cats.forEach(c=>{
     const el=document.createElement("div");
     el.className="cat-chip"+(c.id===DB.activeCat?" active":"");
-    el.innerHTML=`<span style="width:9px;height:9px;border-radius:50%;background:${c.color};display:inline-block"></span>${c.name}`;
-    el.onclick=()=>{ DB.activeCat=c.id; save(); renderCatPill(); renderCatManage(); renderHistory(); renderStats(); };
+    el.innerHTML=`<span style="width:9px;height:9px;border-radius:50%;background:${c.color};display:inline-block"></span>${escapeHtml(c.name)}`;
+    el.onclick=()=>{ DB.activeCat=c.id; save(); renderCatPill(); renderCatManage(); renderStock(); renderFlow(); renderStats(); renderAlerts(); };
     box.appendChild(el);
   });
 }
@@ -502,10 +936,14 @@ function openCatSheet(id){
   let picked=COLORS[0];
   if(id){ const c=DB.cats.find(x=>x.id===id); title.textContent="编辑猫咪"; nameInput.value=c.name; picked=c.color; }
   else { title.textContent="添加猫咪"; nameInput.value=""; }
-  COLORS.forEach((col,i)=>{
+  COLORS.forEach((col)=>{
     const s=document.createElement("div"); s.className="sug"; s.textContent="●"; s.style.color=col;
     if(col===picked){ s.style.borderColor=col; s.style.background=col+"22"; }
-    s.onclick=()=>{ picked=col; colorBox.querySelectorAll(".sug").forEach(x=>{x.style.background="";x.style.borderColor="";}); s.style.background=col+"22"; s.style.borderColor=col; };
+    s.onclick=()=>{
+      picked=col;
+      colorBox.querySelectorAll(".sug").forEach(x=>{x.style.background="";x.style.borderColor="";});
+      s.style.background=col+"22"; s.style.borderColor=col;
+    };
     colorBox.appendChild(s);
   });
   document.getElementById("catMask").classList.add("show");
@@ -518,11 +956,11 @@ document.getElementById("catSaveBtn").onclick=()=>{
   const sugs=document.querySelectorAll("#colorBox .sug");
   sugs.forEach((s,i)=>{ if(s.style.background && s.style.background!=="") picked=COLORS[i]; });
   if(editCatId){ const c=DB.cats.find(x=>x.id===editCatId); c.name=nm; c.color=picked; }
-  else { DB.cats.push({id:"c"+Date.now(),name:nm,color:picked}); }
-  save(); closeCatSheet(); renderCatPill(); renderCatManage();
+  else { DB.cats.push({id:uid("c"),name:nm,color:picked}); }
+  save(); closeCatSheet(); renderCatPill(); renderCatManage(); renderStock(); renderStats(); renderAlerts();
 };
 function closeCatSheet(){ document.getElementById("catMask").classList.remove("show"); }
-document.querySelectorAll("[data-close]").forEach(x=>x.onclick=closeCatSheet);
+document.querySelectorAll("[data-close-cat]").forEach(x=>x.onclick=closeCatSheet);
 document.getElementById("catMask").onclick=e=>{ if(e.target.id==="catMask") closeCatSheet(); };
 
 /* ---------- 设置 ---------- */
@@ -542,22 +980,21 @@ document.getElementById("saveSetBtn").onclick=()=>{
 document.getElementById("exportBtn").onclick=()=>{
   const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
-  a.href=url; a.download="猫猫日常备份_"+new Date().toISOString().slice(0,10)+".json"; a.click();
+  a.href=url; a.download="猫猫库存备份_"+new Date().toISOString().slice(0,10)+".json"; a.click();
   URL.revokeObjectURL(url); toast("已导出 📤");
 };
 document.getElementById("importBtn").onclick=()=>document.getElementById("importFile").click();
 document.getElementById("importFile").onchange=e=>{
   const f=e.target.files[0]; if(!f) return;
   const rd=new FileReader();
-  rd.onload=()=>{ try{ const d=JSON.parse(rd.result); if(!d.records) throw 0;
+  rd.onload=()=>{ try{ const d=JSON.parse(rd.result); if(!d.inventory) throw 0;
     if(confirm("导入将覆盖当前数据，确定继续？")){ DB=d; save(); renderAll(); toast("导入成功 📥"); } }
     catch(err){ toast("文件格式不正确"); } };
   rd.readAsText(f); e.target.value="";
 };
 document.getElementById("clearBtn").onclick=()=>{
-  if(confirm("确定清空所有记录、猫咪与设置？此操作不可恢复！")){
-    DB={cats:[{id:"c1",name:"默认猫咪",color:"#5D8C61"}],activeCat:"c1",settings:{bath:30,dewi:90,dewe:30},library:{},records:[]};
-    save(); renderAll(); toast("已清空");
+  if(confirm("确定清空所有库存、流水、猫咪与设置？此操作不可恢复！")){
+    DB=defaultDB(); save(); renderAll(); toast("已清空");
   }
 };
 
@@ -567,10 +1004,11 @@ document.querySelectorAll(".tab").forEach(t=>{
     document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
     t.classList.add("active");
     const tab=t.dataset.tab;
-    ["record","history","stats","me"].forEach(k=>{
+    ["stock","flow","stats","me"].forEach(k=>{
       document.getElementById("tab-"+k).classList.toggle("hidden",k!==tab);
     });
-    if(tab==="history") renderHistory();
+    if(tab==="stock"){ renderAlerts(); renderStock(); }
+    if(tab==="flow") renderFlow();
     if(tab==="stats") renderStats();
     if(tab==="me"){ renderCatManage(); initSettings(); }
   };
@@ -578,9 +1016,17 @@ document.querySelectorAll(".tab").forEach(t=>{
 
 /* ---------- 初始化 ---------- */
 function renderAll(){
-  renderCatPill(); renderTypeGrid(); renderSuggestions(); renderFilters(); renderHistory(); renderStats(); renderCatManage(); initForm(); initSettings();
+  renderCatPill();
+  renderStockFilter(); renderStock(); renderAlerts();
+  renderFlowFilter(); renderFlow();
+  renderStats();
+  renderCatManage();
+  initSettings();
 }
 renderAll();
+
+/* 兜底：调试版 v1 迁移提示 */
+console.log("Cat Daily v2 loaded. inventory="+DB.inventory.length+", careLogs="+DB.careLogs.length);
 </script>
 </body>
 </html>

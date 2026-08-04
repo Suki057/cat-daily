@@ -201,6 +201,7 @@
   .cat-chip .x.confirming::before{content:"确认";margin-right:2px;}
   .cat-chip .x.confirming::after{content:"✕";font-size:14px;}
   @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
+  @keyframes armPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,255,255,0);}50%{transform:scale(1.04);box-shadow:0 4px 18px rgba(0,0,0,.18);}}
   .cat-chip.active{border-color:var(--accent);color:var(--accent-ink);background:#fff;box-shadow:var(--shadow-xs);}
 
   .empty{text-align:center;color:var(--muted);padding:30px 14px;font-size:14px;border:1.5px dashed var(--line-soft);border-radius:var(--radius-sm);margin-top:4px;}
@@ -1070,22 +1071,6 @@ function recoverFromRecycle(rbId){
   toast("已恢复 ↩️");
 }
 
-function recoverAllFromRecycle(){
-  if(DB.recycleBin.length===0) return;
-  if(!confirm("恢复回收站全部 "+DB.recycleBin.length+" 项？")) return;
-  DB.recycleBin.slice().forEach(r=>recoverFromRecycle(r.id));
-  toast("已全部恢复 ↩️");
-}
-
-function emptyRecycleBin(){
-  if(DB.recycleBin.length===0) return;
-  if(!confirm("清空回收站所有 "+DB.recycleBin.length+" 项？\n此操作不可恢复。")) return;
-  DB.recycleBin = [];
-  save();
-  renderRecycleList(); renderRecycleBadge();
-  toast("已清空 🚮");
-}
-
 function openRecycleSheet(){
   renderRecycleList();
   document.getElementById("recycleMask").classList.add("show");
@@ -1147,31 +1132,108 @@ function renderRecycleList(){
           <span class="tag">${delDate} 删除</span>
         </div>
         <div style="margin-top:9px;display:flex;gap:7px;">
-          <button data-recover="${r.id}" style="background:var(--accent-soft);border:1.5px solid var(--accent);color:var(--accent-ink);border-radius:11px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;">↩️ 恢复</button>
-          <button data-permdel="${r.id}" style="background:rgba(216,124,95,.08);border:1px solid rgba(216,124,95,.3);color:var(--coral-ink);border-radius:11px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;">永久删除</button>
+          <button data-recover="${r.id}" data-arm="0" style="background:var(--accent-soft);border:1.5px solid var(--accent);color:var(--accent-ink);border-radius:11px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">↩️ 恢复</button>
+          <button data-permdel="${r.id}" data-arm="0" style="background:rgba(216,124,95,.08);border:1px solid rgba(216,124,95,.3);color:var(--coral-ink);border-radius:11px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">永久删除</button>
         </div>
       </div>
     </div>`;
   });
   box.innerHTML = html;
 
-  box.querySelectorAll("[data-recover]").forEach(b=>b.onclick=()=>recoverFromRecycle(b.dataset.recover));
-  box.querySelectorAll("[data-permdel]").forEach(b=>b.onclick=()=>{
-    const r = DB.recycleBin.find(x=>x.id===b.dataset.permdel);
-    if(!r) return;
-    let tip;
-    if(r.type==="cat") tip = `猫咪：${r.cat.name}`;
-    else tip = `分类：${r.cat.label}（含 ${r.items.length} 项库存）`;
-    if(!confirm("永久删除「"+tip+"」？\n此操作不可恢复。")) return;
-    DB.recycleBin = DB.recycleBin.filter(x=>x.id!==r.id);
-    save();
-    renderRecycleList(); renderRecycleBadge();
-    toast("已永久删除");
+  box.querySelectorAll("[data-recover]").forEach(b=>{
+    const origRecHTML = b.innerHTML;
+    const origRecStyle = b.getAttribute("style")||"";
+    let armRecT = null;
+    b.onclick=()=>{
+      if(b.dataset.arm==="1"){
+        clearTimeout(armRecT);
+        recoverFromRecycle(b.dataset.recover);
+        b.innerHTML = origRecHTML;
+        b.setAttribute("style", origRecStyle);
+        b.dataset.arm = "0";
+        return;
+      }
+      // 第一次：进入待确认
+      b.dataset.arm = "1";
+      b.innerHTML = "再点一次确认 ↩️";
+      b.setAttribute("style", "background:var(--accent);border:1.5px solid var(--accent);color:#fff;border-radius:11px;padding:5px 11px;font-size:12px;font-weight:800;cursor:pointer;animation:armPulse 1s ease-in-out infinite;");
+      armRecT = setTimeout(()=>{
+        b.innerHTML = origRecHTML;
+        b.setAttribute("style", origRecStyle);
+        b.dataset.arm = "0";
+      }, 3000);
+    };
+  });
+  box.querySelectorAll("[data-permdel]").forEach(b=>{
+    const origDelHTML = b.innerHTML;
+    const origDelStyle = b.getAttribute("style")||"";
+    let armDelT = null;
+    b.onclick=()=>{
+      if(b.dataset.arm==="1"){
+        clearTimeout(armDelT);
+        const r = DB.recycleBin.find(x=>x.id===b.dataset.permdel);
+        if(r){
+          DB.recycleBin = DB.recycleBin.filter(x=>x.id!==r.id);
+          save();
+          renderRecycleList(); renderRecycleBadge();
+          toast("已永久删除");
+        }
+        return;
+      }
+      // 第一次：进入待确认
+      b.dataset.arm = "1";
+      b.innerHTML = "再点一次确认 ✕";
+      b.setAttribute("style", "background:var(--coral-ink);border:1.5px solid var(--coral-ink);color:#fff;border-radius:11px;padding:5px 11px;font-size:12px;font-weight:800;cursor:pointer;animation:armPulse 1s ease-in-out infinite;");
+      armDelT = setTimeout(()=>{
+        b.innerHTML = origDelHTML;
+        b.setAttribute("style", origDelStyle);
+        b.dataset.arm = "0";
+      }, 3000);
+    };
   });
 }
 
-document.getElementById("recycleEmptyBtn").onclick=emptyRecycleBin;
-document.getElementById("recycleRecoverAllBtn").onclick=recoverAllFromRecycle;
+// 底部两个大按钮：两段式确认
+function armBigBtn(btn, onConfirm, danger){
+  if(btn.dataset.arm==="1"){
+    btn.dataset.arm="0";
+    clearTimeout(btn._t);
+    onConfirm();
+    return;
+  }
+  btn.dataset.arm="1";
+  const orig = btn.innerHTML;
+  const origStyle = btn.getAttribute("style")||"";
+  btn._origHTML = orig;
+  btn._origStyle = origStyle;
+  btn.innerHTML = danger ? "再次确认清空 ✕" : "再次确认恢复 ↩️";
+  btn.setAttribute("style", (danger
+    ? "flex:1;background:var(--coral-ink);color:#fff;animation:armPulse 1s ease-in-out infinite;"
+    : "flex:1;background:var(--accent);color:#fff;animation:armPulse 1s ease-in-out infinite;") +
+    "border:none;border-radius:18px;padding:13px 0;font-weight:800;font-size:14px;cursor:pointer;");
+  btn._t = setTimeout(()=>{
+    btn.dataset.arm="0";
+    btn.innerHTML = btn._origHTML;
+    btn.setAttribute("style", btn._origStyle);
+  }, 3000);
+}
+
+document.getElementById("recycleEmptyBtn").onclick=()=>{
+  if(DB.recycleBin.length===0) return;
+  armBigBtn(document.getElementById("recycleEmptyBtn"), ()=>{
+    DB.recycleBin = [];
+    save();
+    renderRecycleList(); renderRecycleBadge();
+    toast("已清空 🚮");
+  }, true);
+};
+document.getElementById("recycleRecoverAllBtn").onclick=()=>{
+  if(DB.recycleBin.length===0) return;
+  armBigBtn(document.getElementById("recycleRecoverAllBtn"), ()=>{
+    DB.recycleBin.slice().forEach(r=>recoverFromRecycle(r.id));
+    toast("已全部恢复 ↩️");
+  }, false);
+};
 
 /* ---------- 添加自定义分类 ---------- */
 let newCatPickedEm = "📦";

@@ -416,7 +416,10 @@
     <h3>🗑 回收站</h3>
     <div class="desc">7 天前的项会自动清理；可单条恢复 / 永久删除，或一键清空。</div>
     <div id="recycleList"></div>
-    <button class="btn ghost sm" id="recycleEmptyBtn" style="margin-top:14px;">🚮 一键清空回收站</button>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn primary sm" id="recycleRecoverAllBtn" style="flex:1;">↩️ 恢复全部</button>
+      <button class="btn ghost sm" id="recycleEmptyBtn" style="flex:1;">🚮 一键清空</button>
+    </div>
   </div>
 </div>
 
@@ -989,6 +992,83 @@ function sendCategoryToRecycle(cat){
   toast("已移入回收站 🗑");
 }
 
+function sendCatToRecycle(catId){
+  const cat = DB.cats.find(x=>x.id===catId);
+  if(!cat) return;
+  if(!confirm("删除猫咪「"+cat.name+"」？\n关联的库存和护理记录也会移入回收站。")) return;
+  // 1) 备份该猫的库存条目
+  const invItems = DB.inventory.filter(it=>it.catId===catId).map(it=>({...it, logs:[...(it.logs||[])]}));
+  // 2) 备份该猫的护理记录
+  const careItems = DB.careLogs.filter(c=>c.catId===catId).map(c=>({...c}));
+  DB.recycleBin.push({
+    id: uid("rb"),
+    type: "cat",
+    cat: {...cat},
+    isSystem: false,
+    items: invItems,           // 保留字段名 items 兼容现有渲染
+    careItems: careItems,      // 猫还带护理记录
+    deletedAt: Date.now()
+  });
+  // 3) 删除该猫及其关联数据
+  DB.cats = DB.cats.filter(x=>x.id!==catId);
+  DB.inventory = DB.inventory.filter(it=>it.catId!==catId);
+  DB.careLogs = DB.careLogs.filter(c=>c.catId!==catId);
+  // 4) 如果删的是当前猫，把 activeCat 切到第一只（若有）
+  if(DB.activeCat===catId){
+    DB.activeCat = DB.cats[0] ? DB.cats[0].id : null;
+  }
+  save();
+  renderAll();
+  renderRecycleBadge();
+  toast("「"+cat.name+"」已移入回收站 🗑");
+}
+
+function recoverFromRecycle(rbId){
+  const r = DB.recycleBin.find(x=>x.id===rbId);
+  if(!r) return;
+  if(r.type==="category"){
+    if(!r.isSystem){
+      if(!DB.customCats.find(c=>c.key===r.cat.key)){
+        DB.customCats.push(r.cat);
+      }
+    }
+    r.items.forEach(it=>{
+      if(!DB.inventory.find(x=>x.id===it.id)) DB.inventory.push(it);
+    });
+  } else if(r.type==="cat"){
+    if(!DB.cats.find(c=>c.id===r.cat.id)){
+      DB.cats.push(r.cat);
+    }
+    (r.items||[]).forEach(it=>{
+      if(!DB.inventory.find(x=>x.id===it.id)) DB.inventory.push(it);
+    });
+    (r.careItems||[]).forEach(c=>{
+      if(!DB.careLogs.find(x=>x.id===c.id)) DB.careLogs.push(c);
+    });
+  }
+  DB.recycleBin = DB.recycleBin.filter(x=>x.id!==r.id);
+  save();
+  renderAll();
+  renderRecycleList(); renderRecycleBadge();
+  toast("已恢复 ↩️");
+}
+
+function recoverAllFromRecycle(){
+  if(DB.recycleBin.length===0) return;
+  if(!confirm("恢复回收站全部 "+DB.recycleBin.length+" 项？")) return;
+  DB.recycleBin.slice().forEach(r=>recoverFromRecycle(r.id));
+  toast("已全部恢复 ↩️");
+}
+
+function emptyRecycleBin(){
+  if(DB.recycleBin.length===0) return;
+  if(!confirm("清空回收站所有 "+DB.recycleBin.length+" 项？\n此操作不可恢复。")) return;
+  DB.recycleBin = [];
+  save();
+  renderRecycleList(); renderRecycleBadge();
+  toast("已清空 🚮");
+}
+
 function openRecycleSheet(){
   renderRecycleList();
   document.getElementById("recycleMask").classList.add("show");
@@ -1008,26 +1088,43 @@ function renderRecycleBadge(){
 function renderRecycleList(){
   const box=document.getElementById("recycleList");
   const emptyBtn=document.getElementById("recycleEmptyBtn");
+  const recoverAllBtn=document.getElementById("recycleRecoverAllBtn");
   box.innerHTML="";
   if(DB.recycleBin.length===0){
     box.innerHTML='<div class="empty"><span class="em">🧺</span>回收站是空的</div>';
     emptyBtn.style.display="none";
+    if(recoverAllBtn) recoverAllBtn.style.display="none";
     return;
   }
   emptyBtn.style.display="";
+  if(recoverAllBtn) recoverAllBtn.style.display="";
   let html="";
   DB.recycleBin.slice().sort((a,b)=>b.deletedAt-a.deletedAt).forEach(r=>{
     const leftMs = (r.deletedAt + 7*24*3600*1000) - Date.now();
     const leftDays = Math.max(0, Math.ceil(leftMs/86400000));
     const tagCls = leftDays<=1?"warn":leftDays<=3?"amber":"";
     const tagTxt = `剩 ${leftDays} 天清理`;
-    const em = r.cat && r.cat.em ? r.cat.em : "📁";
-    const lbl = `分类：${escapeHtml(r.cat.label)}（含 ${r.items.length} 项库存）`;
     const delDate = new Date(r.deletedAt).toLocaleDateString("zh-CN");
+    let em, lbl, icBg;
+    if(r.type==="cat"){
+      em = "🐈";
+      icBg = r.cat.color || "#5D8C61";
+      const careN = (r.careItems||[]).length;
+      const invN = (r.items||[]).length;
+      const sub = [];
+      if(invN) sub.push(`${invN} 项库存`);
+      if(careN) sub.push(`${careN} 条护理记录`);
+      lbl = `<div style="font-weight:800;font-size:14px;color:var(--ink);">猫咪：${escapeHtml(r.cat.name)}</div>` +
+            (sub.length?`<div style="font-size:12px;color:var(--muted);margin-top:3px;">含 ${sub.join("、")}</div>`:"");
+    } else {
+      em = r.cat && r.cat.em ? r.cat.em : "📁";
+      icBg = r.cat.color || "#8A9A7D";
+      lbl = `<div style="font-weight:800;font-size:14px;color:var(--ink);">分类：${escapeHtml(r.cat.label)}（含 ${r.items.length} 项库存）</div>`;
+    }
     html += `<div class="list-row" style="border:1px solid var(--line-soft);border-radius:14px;padding:11px 13px;margin-bottom:9px;background:var(--surface-2);align-items:flex-start;">
-      <div class="ic" style="font-size:20px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:${r.cat.color||'#8A9A7D'}22;">${em}</div>
+      <div class="ic" style="font-size:20px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:${icBg}22;">${em}</div>
       <div class="lb" style="flex:1;min-width:0;">
-        <div style="font-weight:800;font-size:14px;color:var(--ink);">${lbl}</div>
+        ${lbl}
         <div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;">
           <span class="tag ${tagCls}">${tagTxt}</span>
           <span class="tag">${delDate} 删除</span>
@@ -1041,29 +1138,13 @@ function renderRecycleList(){
   });
   box.innerHTML = html;
 
-  box.querySelectorAll("[data-recover]").forEach(b=>b.onclick=()=>{
-    const r = DB.recycleBin.find(x=>x.id===b.dataset.recover);
-    if(!r) return;
-    // 恢复：自定义分类重建 + 库存条目放回
-    if(!r.isSystem){
-      if(!DB.customCats.find(c=>c.key===r.cat.key)){
-        DB.customCats.push(r.cat);
-      }
-    }
-    r.items.forEach(it=>{
-      if(!DB.inventory.find(x=>x.id===it.id)) DB.inventory.push(it);
-    });
-    DB.recycleBin = DB.recycleBin.filter(x=>x.id!==r.id);
-    save();
-    renderRecycleList(); renderRecycleBadge();
-    renderStockFilter(); renderStock(); renderStats(); renderFlow(); renderAlerts();
-    renderCustomCatList();
-    toast("已恢复 ↩️");
-  });
+  box.querySelectorAll("[data-recover]").forEach(b=>b.onclick=()=>recoverFromRecycle(b.dataset.recover));
   box.querySelectorAll("[data-permdel]").forEach(b=>b.onclick=()=>{
     const r = DB.recycleBin.find(x=>x.id===b.dataset.permdel);
     if(!r) return;
-    const tip = `分类：${r.cat.label}（含 ${r.items.length} 项库存）`;
+    let tip;
+    if(r.type==="cat") tip = `猫咪：${r.cat.name}`;
+    else tip = `分类：${r.cat.label}（含 ${r.items.length} 项库存）`;
     if(!confirm("永久删除「"+tip+"」？\n此操作不可恢复。")) return;
     DB.recycleBin = DB.recycleBin.filter(x=>x.id!==r.id);
     save();
@@ -1072,14 +1153,8 @@ function renderRecycleList(){
   });
 }
 
-document.getElementById("recycleEmptyBtn").onclick=()=>{
-  if(DB.recycleBin.length===0) return;
-  if(!confirm("清空回收站所有 " +DB.recycleBin.length+ " 项？\n此操作不可恢复。")) return;
-  DB.recycleBin = [];
-  save();
-  renderRecycleList(); renderRecycleBadge();
-  toast("已清空 🚮");
-};
+document.getElementById("recycleEmptyBtn").onclick=emptyRecycleBin;
+document.getElementById("recycleRecoverAllBtn").onclick=recoverAllFromRecycle;
 
 /* ---------- 添加自定义分类 ---------- */
 let newCatPickedEm = "📦";
@@ -1144,22 +1219,9 @@ function renderCustomCatList(){
     html += `<div class="list-row" style="border-bottom:1px solid var(--line-soft);">
       <div class="ic" style="font-size:22px;background:${c.color}22;border-radius:10px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;">${c.em}</div>
       <div class="lb">${escapeHtml(c.label)}</div>
-      <button class="mini danger" data-delcat="${c.key}" style="background:rgba(216,124,95,.08);border:1px solid rgba(216,124,95,.3);color:var(--coral-ink);border-radius:11px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">删除</button>
     </div>`;
   });
   box.innerHTML = html;
-  box.querySelectorAll("[data-delcat]").forEach(b=>b.onclick=()=>{
-    const k=b.dataset.delcat;
-    const used = DB.inventory.some(it=>it.cat===k);
-    if(used){ if(!confirm("该分类下还有库存条目，删除分类后这些条目会显示为「其他」。确定？")) return; }
-    else if(!confirm("删除这个自定义分类？")) return;
-    DB.customCats = DB.customCats.filter(c=>c.key!==k);
-    DB.inventory.forEach(it=>{ if(it.cat===k) it.cat="other"; });
-    if(stockFilter===k) stockFilter="all";
-    save();
-    renderStockFilter(); renderStock(); renderCustomCatList(); renderStats(); renderFlow(); renderAlerts();
-    toast("已删除");
-  });
 }
 
 /* ---------- 记录页：护理记录 + 日用品 ---------- */
@@ -1433,7 +1495,8 @@ function renderCatManage(){
   DB.cats.forEach(c=>{
     const el=document.createElement("div");
     el.className="cat-chip"+(c.id===DB.activeCat?" active":"");
-    el.innerHTML=`<span style="width:9px;height:9px;border-radius:50%;background:${c.color};display:inline-block"></span>${escapeHtml(c.name)}`;
+    el.innerHTML=`<span style="width:9px;height:9px;border-radius:50%;background:${c.color};display:inline-block"></span>${escapeHtml(c.name)}<span class="x" data-delcat="${c.id}" title="删除" style="margin-left:4px;cursor:pointer;">×</span>`;
+    el.querySelector("[data-delcat]").onclick=(e)=>{ e.stopPropagation(); sendCatToRecycle(c.id); };
     el.onclick=()=>{ DB.activeCat=c.id; save(); renderCatPill(); renderCatManage(); renderStock(); renderFlow(); renderStats(); renderAlerts(); };
     box.appendChild(el);
   });

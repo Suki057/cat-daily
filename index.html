@@ -588,6 +588,10 @@ function bindSwipeRow(wrap, handlers){
     open=false;
   }
   front.addEventListener("touchstart", e=>{
+    // 子按钮 (act-btn / swipe-actions / 原生 button) 上的 touch 不应启动 swipe 拖拽,
+    // 否则 touchend → reset 序列会让某些 iOS 浏览器不触发后续 click.
+    // 影响: 护理/库存卡右侧 ✏️🗑 按钮点击事件被吞, 表现为"点编辑没反应".
+    if(e.target.closest(".act-btn, .swipe-actions, button, a, input, textarea, select, label")) return;
     const t = e.touches[0]; startX=t.clientX; startY=t.clientY; dx=0; dy=0; dragging=true;
     closeAll();
   }, {passive:true});

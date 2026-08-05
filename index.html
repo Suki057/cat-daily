@@ -417,6 +417,23 @@
   </div>
 </div>
 
+<!-- 护理编辑 sheet (左滑 → 编辑 用) -->
+<div class="mask" id="careEditMask">
+  <div class="sheet" style="position:relative;">
+    <span class="close-x" data-close-careedit>×</span>
+    <h3>✏️ 编辑护理打卡</h3>
+    <div id="careEditTypeLabel" style="margin:-4px 0 12px;font-size:13px;color:var(--muted);"></div>
+    <label>时间</label>
+    <input type="datetime-local" id="careEditTs">
+    <label>备注</label>
+    <input type="text" id="careEditNote" placeholder="（可选）">
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn ghost sm" data-close-careedit style="flex:1;">取消</button>
+      <button class="btn primary sm" id="careEditSaveBtn" style="flex:1;">保存</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="importFile" accept="application/json" class="hidden" />
 <div class="toast" id="toast"></div>
 
@@ -593,11 +610,41 @@ function bindSwipeRow(wrap, handlers){
   front.addEventListener("mousedown", e=>{ md=true; mx0=e.clientX; dx=0; closeAll(); });
   window.addEventListener("mousemove", e=>{ if(!md) return; dx=e.clientX-mx0; if(Math.abs(dx)<8) return; let x=Math.min(0,Math.max(-ACTIONS_W,dx)); front.style.transform=`translateX(${x}px)`; });
   window.addEventListener("mouseup", e=>{ if(!md) return; md=false; if(dx<-THRESHOLD){ front.style.transform=`translateX(${-ACTIONS_W}px)`; wrap.classList.add("open"); open=true;} else reset(); });
-  // 编辑 / 删除按钮
+  // 编辑 / 删除按钮 (删除内置两段式确认, 避免 iOS WebView 吞 confirm() 弹窗)
   const editBtn = wrap.querySelector(".swipe-actions .edit");
   const delBtn  = wrap.querySelector(".swipe-actions .del");
   if(editBtn && handlers.onEdit) editBtn.onclick = e=>{ e.stopPropagation(); reset(); handlers.onEdit(); };
-  if(delBtn && handlers.onDelete) delBtn.onclick = e=>{ e.stopPropagation(); reset(); handlers.onDelete(); };
+  if(delBtn && handlers.onDelete){
+    let armed = false, armTimer = null;
+    const origDelHTML = delBtn.innerHTML;
+    const origDelStyle = delBtn.getAttribute("style")||"";
+    function disarmDel(){
+      armed = false;
+      if(armTimer){ clearTimeout(armTimer); armTimer=null; }
+      if(document.body.contains(delBtn)){
+        delBtn.innerHTML = origDelHTML;
+        delBtn.setAttribute("style", origDelStyle);
+      }
+    }
+    delBtn.onclick = e=>{
+      e.stopPropagation();
+      if(armed){
+        // 第二次点: 真正执行, 关闭 swipe
+        disarmDel();
+        reset();
+        handlers.onDelete();
+        return;
+      }
+      // 第一次点: 进入"再次确认"状态, 保持 swipe 打开
+      armed = true;
+      delBtn.innerHTML = "再次确认删除";
+      delBtn.setAttribute("style",
+        "flex:1;display:flex;align-items:center;justify-content:center;gap:6px;" +
+        "color:#fff;font-weight:800;font-size:13px;border:none;cursor:pointer;" +
+        "background:#B85F40;animation:armPulse 1s ease-in-out infinite;");
+      armTimer = setTimeout(disarmDel, 3000);
+    };
+  }
   // 点空白处收回
   wrap.addEventListener("click", e=>{ if(open && !e.target.closest(".swipe-actions")) reset(); });
 }
@@ -815,7 +862,7 @@ function renderStock(){
       onDelete: ()=>{
         const it = DB.inventory.find(x=>x.id===id);
         if(!it) return;
-        if(!confirm("确定删除「"+(it.name||"该库存")+"」？删除后可在回收站恢复。")) return;
+        // bindSwipeRow 已内置两段式确认, 此处直接执行
         sendToRecycle("inventory", {id:it.id, cat:it.cat, name:it.name}, it);
         DB.inventory = DB.inventory.filter(x=>x.id!==id);
         save();
@@ -1089,6 +1136,16 @@ function recoverFromRecycle(rbId){
       if(!DB.inventory.find(x=>x.id===it.id)) DB.inventory.push(it);
     });
     (r.careItems||[]).forEach(c=>{
+      if(!DB.careLogs.find(x=>x.id===c.id)) DB.careLogs.push(c);
+    });
+  } else if(r.type==="inventory"){
+    // 单条库存: items[0] 是 sendToRecycle 时的快照
+    (r.items||[]).forEach(it=>{
+      if(!DB.inventory.find(x=>x.id===it.id)) DB.inventory.push(it);
+    });
+  } else if(r.type==="care"){
+    // 单条护理打卡: items[0] 是快照
+    (r.items||[]).forEach(c=>{
       if(!DB.careLogs.find(x=>x.id===c.id)) DB.careLogs.push(c);
     });
   }
@@ -1459,7 +1516,7 @@ function renderCareLog(){
       onDelete: ()=>{
         const it = DB.careLogs.find(x=>x.id===id);
         if(!it) return;
-        if(!confirm("确定删除这条护理打卡？删除后可在回收站恢复。")) return;
+        // bindSwipeRow 已内置两段式确认, 此处直接执行
         sendToRecycle("care", {id:it.id, type:it.type, ts:it.ts}, it);
         DB.careLogs = DB.careLogs.filter(x=>x.id!==id);
         save();
@@ -1543,27 +1600,42 @@ function renderStats(){
     save(); renderStats(); renderFlow(); renderCareLog(); toast("已打卡 ✅");
   });
 
-  // 编辑护理打卡：弹层改时间/备注
+  // 编辑护理打卡：弹层改时间/备注 (iOS WebView 吞 prompt(), 改用 sheet 弹层)
+  let editingCareId = null;
   function openCareEditSheet(id){
     const it = DB.careLogs.find(x=>x.id===id);
     if(!it) return;
+    editingCareId = id;
     const t = CARE[it.type] || CARE.other;
-    let picker = prompt(`编辑 ${t.label}\n新时间（YYYY-MM-DD HH:mm）留空保持不变：`, fmtLocal(it.ts));
-    if(picker===null) return;
-    picker = picker.trim();
-    if(picker){
-      const d = new Date(picker);
+    document.getElementById("careEditTypeLabel").innerHTML =
+      `<span style="font-size:18px;margin-right:6px;">${t.em}</span>${escapeHtml(t.label)}`;
+    document.getElementById("careEditTs").value = fmtLocal(it.ts);
+    document.getElementById("careEditNote").value = it.note || "";
+    document.getElementById("careEditMask").classList.add("show");
+  }
+  function closeCareEditSheet(){
+    document.getElementById("careEditMask").classList.remove("show");
+    editingCareId = null;
+  }
+  document.querySelectorAll("[data-close-careedit]").forEach(x=>x.onclick=closeCareEditSheet);
+  document.getElementById("careEditMask").onclick=e=>{
+    if(e.target.id==="careEditMask") closeCareEditSheet();
+  };
+  document.getElementById("careEditSaveBtn").onclick=()=>{
+    const it = DB.careLogs.find(x=>x.id===editingCareId);
+    if(!it) return;
+    const v = document.getElementById("careEditTs").value;
+    if(v){
+      const d = new Date(v);
       if(isNaN(d.getTime())){ toast("时间格式不对"); return; }
       it.ts = d.getTime();
     }
-    const note = prompt("备注（留空保持不变）：", it.note||"");
-    if(note===null) return;
-    it.note = note.trim();
+    it.note = document.getElementById("careEditNote").value.trim();
     save();
+    closeCareEditSheet();
     renderStats(); renderFlow(); renderCareLog();
-    toast("已更新 ✅");
-  }
-  window.openCareEditSheet = openCareEditSheet;
+    toast("已更新 ✏️");
+  };
 
   const cbox = document.getElementById("catSummary");
   const totals={}; let max=0;

@@ -421,7 +421,7 @@
 <div class="mask" id="careEditMask">
   <div class="sheet" style="position:relative;">
     <span class="close-x" data-close-careedit>×</span>
-    <h3>✏️ 编辑护理打卡</h3>
+    <h3 id="careEditTitle">✏️ 编辑护理打卡</h3>
     <div id="careEditTypeLabel" style="margin:-4px 0 12px;font-size:13px;color:var(--muted);"></div>
     <label>时间</label>
     <input type="datetime-local" id="careEditTs">
@@ -1498,6 +1498,10 @@ function renderCareLog(){
             <div class="t1">${t.label} <span class="tag">${t.em}</span></div>
             <div class="t2">${e.note?escapeHtml(e.note)+" · ":""}${fmtTime(e.ts)}</div>
           </div>
+          <div class="acts">
+            <button class="act-btn edit" data-editcare="${e.id}" title="编辑">✏️</button>
+            <button class="act-btn del" data-delcare="${e.id}" title="删除">🗑</button>
+          </div>
         </div>
         <div class="swipe-actions">
           <button class="act edit">✏️ 编辑</button>
@@ -1508,6 +1512,41 @@ function renderCareLog(){
     html += "</div>";
   });
   box.innerHTML = html;
+  // 护理记录右侧图标按钮 (无需左滑)
+  box.querySelectorAll("[data-editcare]").forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    openCareEditSheet(b.dataset.editcare);
+  });
+  box.querySelectorAll("[data-delcare]").forEach(b=>{
+    const btn = b;
+    const origHTML = btn.innerHTML;
+    const origStyle = btn.getAttribute("style")||"";
+    let armT = null;
+    btn.onclick = e => {
+      e.stopPropagation();
+      if(btn.dataset.arm==="1"){
+        clearTimeout(armT);
+        const id = btn.dataset.delcare;
+        const it = DB.careLogs.find(x=>x.id===id);
+        if(it){
+          sendToRecycle("care", {id:it.id, type:it.type, ts:it.ts}, it);
+          DB.careLogs = DB.careLogs.filter(x=>x.id!==id);
+          save();
+          renderCareLog(); renderStats();
+          toast("已删除到回收站 🗑");
+        }
+        return;
+      }
+      btn.dataset.arm = "1";
+      btn.innerHTML = "✓";
+      btn.setAttribute("style", "background:var(--coral-ink);border:1.5px solid var(--coral-ink);color:#fff;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;animation:armPulse 1s ease-in-out infinite;padding:0;line-height:1;");
+      armT = setTimeout(()=>{
+        btn.dataset.arm = "0";
+        btn.innerHTML = origHTML;
+        btn.setAttribute("style", origStyle);
+      }, 3000);
+    };
+  });
   // 护理记录左滑：编辑/删除
   box.querySelectorAll(".swipe-wrap").forEach(wrap=>{
     const id = wrap.dataset.care;
@@ -1596,45 +1635,83 @@ function renderStats(){
   cb.innerHTML = ch;
   cb.querySelectorAll("[data-care]").forEach(b=>b.onclick=()=>{
     const key = b.dataset.care;
-    DB.careLogs.push({id:uid("cl"), catId:DB.activeCat, type:key, ts:Date.now(), note:""});
-    save(); renderStats(); renderFlow(); renderCareLog(); toast("已打卡 ✅");
+    openCareCheckinSheet(key);
   });
 
-  // 编辑护理打卡：弹层改时间/备注 (iOS WebView 吞 prompt(), 改用 sheet 弹层)
-  let editingCareId = null;
+  // 护理打卡 sheet (左滑 → 编辑 / 立即打卡 → 新增 共用)
+  let editingCareId = null;        // 已有 id = 编辑模式; null = 新增模式
+  let editingCareKey = null;       // 新增模式时记录 type key
   function openCareEditSheet(id){
     const it = DB.careLogs.find(x=>x.id===id);
     if(!it) return;
     editingCareId = id;
-    const t = CARE[it.type] || CARE.other;
+    editingCareKey = null;
+    fillCareEditSheet(CARE[it.type] || CARE.other, it.ts, it.note||"");
+    document.getElementById("careEditTitle").textContent = "✏️ 编辑护理打卡";
+    document.getElementById("careEditSaveBtn").textContent = "保存";
+    document.getElementById("careEditMask").classList.add("show");
+  }
+  function openCareCheckinSheet(key){
+    editingCareId = null;
+    editingCareKey = key;
+    const t = CARE[key] || CARE.other;
+    // 默认时间为"现在" (datetime-local 要 YYYY-MM-DDTHH:MM)
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    fillCareEditSheet(t, null, "", local);
+    document.getElementById("careEditTitle").textContent = "🪄 立即打卡";
+    document.getElementById("careEditSaveBtn").textContent = "保存并打卡";
+    document.getElementById("careEditMask").classList.add("show");
+  }
+  function fillCareEditSheet(t, ts, note, tsDefault){
     document.getElementById("careEditTypeLabel").innerHTML =
       `<span style="font-size:18px;margin-right:6px;">${t.em}</span>${escapeHtml(t.label)}`;
-    document.getElementById("careEditTs").value = fmtLocal(it.ts);
-    document.getElementById("careEditNote").value = it.note || "";
-    document.getElementById("careEditMask").classList.add("show");
+    document.getElementById("careEditTs").value = ts ? fmtLocal(ts) : (tsDefault || "");
+    document.getElementById("careEditNote").value = note || "";
   }
   function closeCareEditSheet(){
     document.getElementById("careEditMask").classList.remove("show");
     editingCareId = null;
+    editingCareKey = null;
   }
   document.querySelectorAll("[data-close-careedit]").forEach(x=>x.onclick=closeCareEditSheet);
   document.getElementById("careEditMask").onclick=e=>{
     if(e.target.id==="careEditMask") closeCareEditSheet();
   };
   document.getElementById("careEditSaveBtn").onclick=()=>{
-    const it = DB.careLogs.find(x=>x.id===editingCareId);
-    if(!it) return;
     const v = document.getElementById("careEditTs").value;
-    if(v){
+    const note = document.getElementById("careEditNote").value.trim();
+    if(editingCareId){
+      // 编辑模式
+      const it = DB.careLogs.find(x=>x.id===editingCareId);
+      if(!it) return;
+      if(v){
+        const d = new Date(v);
+        if(isNaN(d.getTime())){ toast("时间格式不对"); return; }
+        it.ts = d.getTime();
+      }
+      it.note = note;
+      save();
+      closeCareEditSheet();
+      renderStats(); renderFlow(); renderCareLog();
+      toast("已更新 ✏️");
+    } else if(editingCareKey){
+      // 新增模式
+      if(!v){ toast("请选择打卡时间"); return; }
       const d = new Date(v);
       if(isNaN(d.getTime())){ toast("时间格式不对"); return; }
-      it.ts = d.getTime();
+      DB.careLogs.push({
+        id: uid("cl"),
+        catId: DB.activeCat,
+        type: editingCareKey,
+        ts: d.getTime(),
+        note: note
+      });
+      save();
+      closeCareEditSheet();
+      renderStats(); renderFlow(); renderCareLog();
+      toast("已打卡 ✅");
     }
-    it.note = document.getElementById("careEditNote").value.trim();
-    save();
-    closeCareEditSheet();
-    renderStats(); renderFlow(); renderCareLog();
-    toast("已更新 ✏️");
   };
 
   const cbox = document.getElementById("catSummary");

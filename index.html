@@ -951,6 +951,8 @@ document.getElementById("invMask").onclick=e=>{ if(e.target.id==="invMask") clos
 document.getElementById("invSaveBtn").onclick=()=>{
   const name = document.getElementById("invName").value.trim();
   if(!name){ toast("请填写名称"); return; }
+  // UI 暂未暴露品牌字段, 用空串占位(避免 strict 模式下 ReferenceError)
+  const brand = "";
   const spec = document.getElementById("invSpec").value.trim() || "1 件";
   const qty = Math.max(0, +document.getElementById("invQty").value || 0);
   const threshold = Math.max(0, +document.getElementById("invThreshold").value || 0);

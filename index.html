@@ -539,11 +539,15 @@ function uid(p){ return p+Date.now().toString(36)+Math.random().toString(36).sli
 function sendToRecycle(kind, item, snapshot){
   // kind: "inventory" | "care" | "cat"
   DB.recycleBin = DB.recycleBin || [];
+  const snap = snapshot || JSON.parse(JSON.stringify(item));
   DB.recycleBin.push({
     id: uid("rb"),
-    kind,
-    item,                 // 原始 id 等关键信息
-    snapshot: snapshot || JSON.parse(JSON.stringify(item)),  // 完整拷贝
+    type: kind,                       // 统一字段名, renderRecycleList 直接读
+    kind,                             // 保留旧字段避免破坏其它逻辑
+    item,
+    snapshot: snap,
+    cat: { em: "📦", label: item.name || item.title || "条目", color: "#5D8C61", key: item.cat },
+    items: [snap],                    // 单条也包成数组, 1151 行 r.items.length 不会 undefined
     deletedAt: Date.now(),
   });
   save();
@@ -746,7 +750,6 @@ function renderStock(){
         <div class="body" data-edit="${it.id}">
           <div class="t1"><span class="name">${escapeHtml(it.name||c.label)}</span>
             ${it.brand?`<span class="tag">${escapeHtml(it.brand)}</span>`:""}
-            ${isLow?`<span class="tag warn">⚠ 库存低</span>`:""}
           </div>
           <div class="t2">
             ${it.spec?escapeHtml(it.spec):""}
@@ -760,7 +763,6 @@ function renderStock(){
         <div class="acts">
           <button class="act-btn edit" data-edit="${it.id}" title="编辑">✏️</button>
           <button class="act-btn del" data-delinv="${it.id}" title="删除">🗑</button>
-          <button class="act-btn add" data-addnew="${it.cat}" title="新建">＋</button>
         </div>
       </div>
       <div class="swipe-actions">
@@ -800,11 +802,6 @@ function renderStock(){
         btn.setAttribute("style", origStyle);
       }, 3000);
     };
-  });
-  box.querySelectorAll("[data-addnew]").forEach(b=>b.onclick=e=>{
-    e.stopPropagation();
-    invFormCat = b.dataset.addnew;
-    openInvSheet(null, true);
   });
   // 左滑：编辑/删除
   box.querySelectorAll(".swipe-wrap").forEach(wrap=>{
@@ -1129,6 +1126,16 @@ function renderRecycleList(){
   if(recoverAllBtn) recoverAllBtn.style.display="";
   let html="";
   DB.recycleBin.slice().sort((a,b)=>b.deletedAt-a.deletedAt).forEach(r=>{
+    // 兼容 sendToRecycle (单条删除写入 kind/item/snapshot) 和 sendCategoryToRecycle (写入 type/cat/items)
+    if(!r.type && r.kind){
+      r.type = r.kind;
+      if(r.item && !r.cat){
+        r.cat = { em: "📦", label: r.item.name || r.item.title || "条目", color: "#5D8C61", key: r.item.cat };
+      }
+      if(!r.items){
+        r.items = r.snapshot ? [r.snapshot] : (r.item ? [r.item] : []);
+      }
+    }
     const leftMs = (r.deletedAt + 7*24*3600*1000) - Date.now();
     const leftDays = Math.max(0, Math.ceil(leftMs/86400000));
     const tagCls = leftDays<=1?"warn":leftDays<=3?"amber":"";

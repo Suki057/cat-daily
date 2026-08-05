@@ -608,7 +608,7 @@ function bindSwipeRow(wrap, handlers){
   const front = wrap.querySelector(".swipe-front");
   let startX=0, startY=0, dx=0, dy=0, dragging=false, open=false;
   const ACTIONS_W = 160;
-  const THRESHOLD = 70;
+  const THRESHOLD = 50;
   function reset(){ front.style.transform=""; open=false; }
   function closeAll(){
     document.querySelectorAll(".swipe-wrap .swipe-front").forEach(f=>{ f.style.transform=""; });
@@ -622,7 +622,7 @@ function bindSwipeRow(wrap, handlers){
     if(e.target.closest(".act-btn, .swipe-actions, button, a, input, textarea, select, label")) return;
     const t = e.touches[0]; startX=t.clientX; startY=t.clientY; dx=0; dy=0; dragging=true;
     closeAll();
-  }, {passive:true});
+  }, {passive:false});
   front.addEventListener("touchmove", e=>{
     if(!dragging) return;
     const t = e.touches[0]; dx = t.clientX-startX; dy = t.clientY-startY;
